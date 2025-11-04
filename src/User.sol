@@ -52,6 +52,7 @@ contract User {
 
     TopicRegistry public immutable topicRegistry;
     address public reputationEngine; // Will be set after ReputationEngine deployment
+    address public peerRatingContract; // Will be set after PeerRating deployment
 
     /*///////////////////////////
            EVENTS
@@ -94,6 +95,15 @@ contract User {
     function setReputationEngine(address _reputationEngine) external {
         if (reputationEngine != address(0)) revert Unauthorized();
         reputationEngine = _reputationEngine;
+    }
+
+    /**
+     * @notice Set the peer rating contract address (can only be done once)
+     * @param _peerRatingContract Address of the PeerRating contract
+     */
+    function setPeerRatingContract(address _peerRatingContract) external {
+        if (peerRatingContract != address(0)) revert Unauthorized();
+        peerRatingContract = _peerRatingContract;
     }
 
     /**

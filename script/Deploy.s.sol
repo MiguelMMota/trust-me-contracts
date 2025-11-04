@@ -7,6 +7,7 @@ import "../src/User.sol";
 import "../src/Challenge.sol";
 import "../src/ReputationEngine.sol";
 import "../src/Poll.sol";
+import "../src/PeerRating.sol";
 
 contract DeployScript is Script {
     function run() external {
@@ -28,6 +29,9 @@ contract DeployScript is Script {
         Challenge challengeContract = new Challenge(address(topicRegistry), address(userContract));
         console.log("Challenge deployed at:", address(challengeContract));
 
+        PeerRating peerRatingContract = new PeerRating(address(topicRegistry), address(userContract));
+        console.log("PeerRating deployed at:", address(peerRatingContract));
+
         ReputationEngine reputationEngine = new ReputationEngine(
             address(userContract),
             address(challengeContract),
@@ -42,10 +46,13 @@ contract DeployScript is Script {
         );
         console.log("Poll deployed at:", address(pollContract));
 
-        // Set reputation engine references
+        // Set cross-contract references
         userContract.setReputationEngine(address(reputationEngine));
+        userContract.setPeerRatingContract(address(peerRatingContract));
         challengeContract.setReputationEngine(address(reputationEngine));
-        console.log("ReputationEngine references set");
+        peerRatingContract.setReputationEngine(address(reputationEngine));
+        reputationEngine.setPeerRatingContract(address(peerRatingContract));
+        console.log("Contract references set");
 
         // Create initial topics
         uint32 mathId = topicRegistry.createTopic("Mathematics", 0);
@@ -96,6 +103,7 @@ contract DeployScript is Script {
             "- **TopicRegistry**: ", vm.toString(address(topicRegistry)), "\n",
             "- **User**: ", vm.toString(address(userContract)), "\n",
             "- **Challenge**: ", vm.toString(address(challengeContract)), "\n",
+            "- **PeerRating**: ", vm.toString(address(peerRatingContract)), "\n",
             "- **ReputationEngine**: ", vm.toString(address(reputationEngine)), "\n",
             "- **Poll**: ", vm.toString(address(pollContract)), "\n\n",
             "## Topics Created:\n",

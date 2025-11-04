@@ -4,11 +4,12 @@ pragma solidity ^0.8.24;
 import "./User.sol";
 import "./Challenge.sol";
 import "./TopicRegistry.sol";
+import "./PeerRating.sol";
 
 /**
  * @title ReputationEngine
- * @notice Calculates and updates user expertise scores based on challenge performance
- * @dev Implements time-weighted scoring with accuracy and volume factors
+ * @notice Calculates and updates user expertise scores based on challenge performance and peer ratings
+ * @dev Implements time-weighted scoring with accuracy, volume, and peer rating factors
  */
 contract ReputationEngine {
     /*///////////////////////////
@@ -35,6 +36,7 @@ contract ReputationEngine {
     User public immutable userContract;
     Challenge public immutable challengeContract;
     TopicRegistry public immutable topicRegistry;
+    PeerRating public peerRatingContract; // Set after deployment
 
     /*///////////////////////////
            EVENTS
@@ -64,6 +66,15 @@ contract ReputationEngine {
     /*///////////////////////////
       EXTERNAL FUNCTIONS
     ///////////////////////////*/
+
+    /**
+     * @notice Set the peer rating contract address (can only be done once)
+     * @param _peerRatingContract Address of the PeerRating contract
+     */
+    function setPeerRatingContract(address _peerRatingContract) external {
+        if (address(peerRatingContract) != address(0)) revert Unauthorized();
+        peerRatingContract = PeerRating(_peerRatingContract);
+    }
 
     /**
      * @notice Process challenge attempt and update user score
@@ -181,16 +192,54 @@ contract ReputationEngine {
      * @param user User address
      * @param topicId Topic ID
      * @return finalScore Calculated score (50-1000)
+     * @dev Combines challenge-based and peer rating scores, allowing max score via either path
      */
     function calculateExpertiseScore(
         address user,
         uint32 topicId
     ) public view returns (uint16) {
+        uint16 challengeScore = calculateChallengeScore(user, topicId);
+        uint16 peerRatingScore = calculatePeerRatingScore(user, topicId);
+
+        // If neither score exists, return minimum
+        if (challengeScore == 0 && peerRatingScore == 0) {
+            return MIN_SCORE;
+        }
+
+        // If only one exists, return that score
+        if (challengeScore == 0) return peerRatingScore;
+        if (peerRatingScore == 0) return challengeScore;
+
+        // If both exist, use a blended approach that rewards having both
+        // Take the maximum of: challenge score, peer rating score, or weighted blend
+        uint256 blendedScore = (uint256(challengeScore) * 60 + uint256(peerRatingScore) * 40) / 100;
+
+        // Return the highest score to ensure users can reach max via either path
+        uint16 maxScore = challengeScore > peerRatingScore ? challengeScore : peerRatingScore;
+        uint16 finalScore = uint16(blendedScore) > maxScore ? uint16(blendedScore) : maxScore;
+
+        // Ensure score is within bounds
+        if (finalScore < MIN_SCORE) return MIN_SCORE;
+        if (finalScore > MAX_SCORE) return MAX_SCORE;
+
+        return finalScore;
+    }
+
+    /**
+     * @notice Calculate challenge-based expertise score
+     * @param user User address
+     * @param topicId Topic ID
+     * @return score Challenge-based score (0-1000)
+     */
+    function calculateChallengeScore(
+        address user,
+        uint32 topicId
+    ) public view returns (uint16) {
         User.UserTopicExpertise memory expertise = userContract.getUserExpertise(user, topicId);
 
-        // If no challenges attempted, return initial score
+        // If no challenges attempted, return 0
         if (expertise.totalChallenges == 0) {
-            return MIN_SCORE;
+            return 0;
         }
 
         // Calculate accuracy component (0-1000)
@@ -211,8 +260,55 @@ contract ReputationEngine {
         uint256 rawScore = ((weightedAccuracy + weightedVolume) * timeDecayFactor) / 100;
 
         // Ensure score is within bounds
-        if (rawScore < MIN_SCORE) return MIN_SCORE;
-        if (rawScore > MAX_SCORE) return MAX_SCORE;
+        if (rawScore < MIN_SCORE) rawScore = MIN_SCORE;
+        if (rawScore > MAX_SCORE) rawScore = MAX_SCORE;
+
+        return uint16(rawScore);
+    }
+
+    /**
+     * @notice Calculate peer rating-based expertise score
+     * @param user User address
+     * @param topicId Topic ID
+     * @return score Peer rating score (0-1000)
+     */
+    function calculatePeerRatingScore(
+        address user,
+        uint32 topicId
+    ) public view returns (uint16) {
+        // Return 0 if peer rating contract not set
+        if (address(peerRatingContract) == address(0)) {
+            return 0;
+        }
+
+        PeerRating.UserTopicRatings memory ratings = peerRatingContract.getUserTopicRating(user, topicId);
+
+        // If no ratings received, return 0
+        if (ratings.totalRatings == 0) {
+            return 0;
+        }
+
+        // Base score is the average peer rating (0-1000)
+        uint256 baseScore = ratings.averageScore;
+
+        // Apply volume bonus based on number of ratings (credibility increases with more raters)
+        // More ratings = more reliable score
+        uint256 ratingVolumeBonus = calculateRatingVolumeBonus(ratings.totalRatings);
+
+        // Apply time decay based on last rating time
+        uint256 timeDecayFactor = calculateTimeDecay(ratings.lastRatingTime);
+
+        // Combine base score with volume bonus
+        // Base score weighted 80%, volume bonus weighted 20%
+        uint256 weightedBase = (baseScore * 80) / 100;
+        uint256 weightedVolumeBonus = (ratingVolumeBonus * 20) / 100;
+
+        // Apply time decay
+        uint256 rawScore = ((weightedBase + weightedVolumeBonus) * timeDecayFactor) / 100;
+
+        // Ensure score is within bounds
+        if (rawScore < MIN_SCORE) rawScore = MIN_SCORE;
+        if (rawScore > MAX_SCORE) rawScore = MAX_SCORE;
 
         return uint16(rawScore);
     }
@@ -233,6 +329,21 @@ contract ReputationEngine {
         // sqrt(n) * 10, capped at 200
         uint256 bonus = sqrt(totalChallenges) * 10;
         return bonus > 200 ? 200 : bonus;
+    }
+
+    /**
+     * @notice Calculate volume bonus based on number of peer ratings received
+     * @param totalRatings Total ratings received
+     * @return bonus Volume bonus (0-1000) - more ratings = higher credibility
+     */
+    function calculateRatingVolumeBonus(uint32 totalRatings) public pure returns (uint256) {
+        if (totalRatings == 0) return 0;
+
+        // Similar to challenge volume bonus but scaled differently
+        // More peer ratings = higher confidence in the score
+        // Using sqrt for diminishing returns, scaled to reach 1000 at ~100 ratings
+        uint256 bonus = sqrt(totalRatings) * 100;
+        return bonus > 1000 ? 1000 : bonus;
     }
 
     /**
