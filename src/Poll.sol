@@ -11,6 +11,27 @@ import "./TopicRegistry.sol";
  * @dev Supports multiple-choice polls with expertise-weighted results
  */
 contract Poll {
+    /*///////////////////////////
+           ERRORS
+    ///////////////////////////*/
+
+    error Unauthorized();
+    error PollNotFound();
+    error PollNotActive();
+    error PollAlreadyClosed();
+    error PollNotEnded();
+    error AlreadyVoted();
+    error InvalidOption();
+    error InvalidTopic();
+    error InvalidEndTime();
+    error TooFewOptions();
+    error TooManyOptions();
+    error UserNotRegistered();
+
+    /*///////////////////////////
+      TYPE DECLARATIONS
+    ///////////////////////////*/
+
     enum PollStatus {
         Active,
         Closed,
@@ -53,7 +74,10 @@ contract Poll {
         uint32[] optionVoteCounts;
     }
 
-    // State variables
+    /*///////////////////////////
+       STATE VARIABLES
+    ///////////////////////////*/
+
     mapping(uint64 => PollData) public polls;
     mapping(uint64 => mapping(uint8 => PollOption)) public pollOptions; // pollId => optionId => option
     mapping(uint64 => mapping(address => Vote)) public votes; // pollId => voter => vote
@@ -63,12 +87,14 @@ contract Poll {
 
     uint64 public pollCount;
 
-    // Contracts
     User public immutable userContract;
     ReputationEngine public immutable reputationEngine;
     TopicRegistry public immutable topicRegistry;
 
-    // Events
+    /*///////////////////////////
+           EVENTS
+    ///////////////////////////*/
+
     event PollCreated(
         uint64 indexed pollId,
         address indexed creator,
@@ -85,19 +111,9 @@ contract Poll {
     event PollClosed(uint64 indexed pollId);
     event PollFinalized(uint64 indexed pollId, uint8 winningOption);
 
-    // Errors
-    error Unauthorized();
-    error PollNotFound();
-    error PollNotActive();
-    error PollAlreadyClosed();
-    error PollNotEnded();
-    error AlreadyVoted();
-    error InvalidOption();
-    error InvalidTopic();
-    error InvalidEndTime();
-    error TooFewOptions();
-    error TooManyOptions();
-    error UserNotRegistered();
+    /*///////////////////////////
+         CONSTRUCTOR
+    ///////////////////////////*/
 
     constructor(
         address _userContract,
@@ -109,6 +125,10 @@ contract Poll {
         topicRegistry = TopicRegistry(_topicRegistry);
         pollCount = 0;
     }
+
+    /*///////////////////////////
+      EXTERNAL FUNCTIONS
+    ///////////////////////////*/
 
     /**
      * @notice Create a new poll
@@ -249,6 +269,10 @@ contract Poll {
         poll.status = PollStatus.Finalized;
         emit PollFinalized(pollId, winningOption);
     }
+
+    /*///////////////////////////
+        VIEW FUNCTIONS
+    ///////////////////////////*/
 
     /**
      * @notice Get poll data

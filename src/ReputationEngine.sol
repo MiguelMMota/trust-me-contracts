@@ -11,6 +11,17 @@ import "./TopicRegistry.sol";
  * @dev Implements time-weighted scoring with accuracy and volume factors
  */
 contract ReputationEngine {
+    /*///////////////////////////
+           ERRORS
+    ///////////////////////////*/
+
+    error Unauthorized();
+    error InvalidInput();
+
+    /*///////////////////////////
+       STATE VARIABLES
+    ///////////////////////////*/
+
     // Constants for scoring algorithm
     uint16 public constant MIN_SCORE = 50;
     uint16 public constant MAX_SCORE = 1000;
@@ -21,12 +32,14 @@ contract ReputationEngine {
     uint64 public constant RECENT_PERIOD = 30 days;
     uint64 public constant MID_PERIOD = 60 days;
 
-    // Contracts
     User public immutable userContract;
     Challenge public immutable challengeContract;
     TopicRegistry public immutable topicRegistry;
 
-    // Events
+    /*///////////////////////////
+           EVENTS
+    ///////////////////////////*/
+
     event ScoreCalculated(
         address indexed user,
         uint32 indexed topicId,
@@ -34,9 +47,9 @@ contract ReputationEngine {
         uint16 newScore
     );
 
-    // Errors
-    error Unauthorized();
-    error InvalidInput();
+    /*///////////////////////////
+         CONSTRUCTOR
+    ///////////////////////////*/
 
     constructor(
         address _userContract,
@@ -47,6 +60,10 @@ contract ReputationEngine {
         challengeContract = Challenge(_challengeContract);
         topicRegistry = TopicRegistry(_topicRegistry);
     }
+
+    /*///////////////////////////
+      EXTERNAL FUNCTIONS
+    ///////////////////////////*/
 
     /**
      * @notice Process challenge attempt and update user score
@@ -71,83 +88,6 @@ contract ReputationEngine {
         userContract.updateExpertiseScore(user, challengeData.topicId, newScore);
 
         emit ScoreCalculated(user, challengeData.topicId, oldScore, newScore);
-    }
-
-    /**
-     * @notice Calculate expertise score for a user in a topic
-     * @param user User address
-     * @param topicId Topic ID
-     * @return finalScore Calculated score (50-1000)
-     */
-    function calculateExpertiseScore(
-        address user,
-        uint32 topicId
-    ) public view returns (uint16) {
-        User.UserTopicExpertise memory expertise = userContract.getUserExpertise(user, topicId);
-
-        // If no challenges attempted, return initial score
-        if (expertise.totalChallenges == 0) {
-            return MIN_SCORE;
-        }
-
-        // Calculate accuracy component (0-1000)
-        uint256 accuracyScore = (uint256(expertise.correctChallenges) * 1000) / expertise.totalChallenges;
-
-        // Calculate volume bonus (0-200 points, using square root for diminishing returns)
-        uint256 volumeBonus = calculateVolumeBonus(expertise.totalChallenges);
-
-        // Calculate time decay factor (reduces impact of old activity)
-        uint256 timeDecayFactor = calculateTimeDecay(expertise.lastActivityTime);
-
-        // Combine components with weights
-        // accuracyScore is already 0-1000, volumeBonus is 0-200
-        uint256 weightedAccuracy = (accuracyScore * ACCURACY_WEIGHT) / 100;
-        uint256 weightedVolume = (volumeBonus * VOLUME_WEIGHT) / 100;
-
-        // Apply time decay
-        uint256 rawScore = ((weightedAccuracy + weightedVolume) * timeDecayFactor) / 100;
-
-        // Ensure score is within bounds
-        if (rawScore < MIN_SCORE) return MIN_SCORE;
-        if (rawScore > MAX_SCORE) return MAX_SCORE;
-
-        return uint16(rawScore);
-    }
-
-    /**
-     * @notice Calculate volume bonus based on total challenges
-     * @param totalChallenges Total challenges attempted
-     * @return bonus Volume bonus (0-200)
-     */
-    function calculateVolumeBonus(uint32 totalChallenges) public pure returns (uint256) {
-        if (totalChallenges == 0) return 0;
-
-        // Using approximation of square root for gas efficiency
-        // sqrt(n) * 10, capped at 200
-        uint256 bonus = sqrt(totalChallenges) * 10;
-        return bonus > 200 ? 200 : bonus;
-    }
-
-    /**
-     * @notice Calculate time decay factor based on last activity
-     * @param lastActivityTime Timestamp of last activity
-     * @return decayFactor Factor from 50-100 (representing 50%-100%)
-     */
-    function calculateTimeDecay(uint64 lastActivityTime) public view returns (uint256) {
-        uint64 timeSinceActivity = uint64(block.timestamp) - lastActivityTime;
-
-        // Recent activity (0-30 days): 100% weight
-        if (timeSinceActivity < RECENT_PERIOD) {
-            return 100;
-        }
-
-        // Mid-term activity (30-60 days): 75% weight
-        if (timeSinceActivity < MID_PERIOD) {
-            return 75;
-        }
-
-        // Old activity (60+ days): 50% weight (minimum to prevent score from going too low)
-        return 50;
     }
 
     /**
@@ -195,25 +135,6 @@ contract ReputationEngine {
     }
 
     /**
-     * @notice Integer square root using Babylonian method
-     * @param x Input value
-     * @return y Square root of x
-     */
-    function sqrt(uint256 x) internal pure returns (uint256) {
-        if (x == 0) return 0;
-
-        uint256 z = (x + 1) / 2;
-        uint256 y = x;
-
-        while (z < y) {
-            y = z;
-            z = (x / z + z) / 2;
-        }
-
-        return y;
-    }
-
-    /**
      * @notice Preview what score a user would have with an additional correct/incorrect answer
      * @param user User address
      * @param topicId Topic ID
@@ -249,5 +170,113 @@ contract ReputationEngine {
         if (rawScore > MAX_SCORE) return MAX_SCORE;
 
         return uint16(rawScore);
+    }
+
+    /*///////////////////////////
+       PUBLIC FUNCTIONS
+    ///////////////////////////*/
+
+    /**
+     * @notice Calculate expertise score for a user in a topic
+     * @param user User address
+     * @param topicId Topic ID
+     * @return finalScore Calculated score (50-1000)
+     */
+    function calculateExpertiseScore(
+        address user,
+        uint32 topicId
+    ) public view returns (uint16) {
+        User.UserTopicExpertise memory expertise = userContract.getUserExpertise(user, topicId);
+
+        // If no challenges attempted, return initial score
+        if (expertise.totalChallenges == 0) {
+            return MIN_SCORE;
+        }
+
+        // Calculate accuracy component (0-1000)
+        uint256 accuracyScore = (uint256(expertise.correctChallenges) * 1000) / expertise.totalChallenges;
+
+        // Calculate volume bonus (0-200 points, using square root for diminishing returns)
+        uint256 volumeBonus = calculateVolumeBonus(expertise.totalChallenges);
+
+        // Calculate time decay factor (reduces impact of old activity)
+        uint256 timeDecayFactor = calculateTimeDecay(expertise.lastActivityTime);
+
+        // Combine components with weights
+        // accuracyScore is already 0-1000, volumeBonus is 0-200
+        uint256 weightedAccuracy = (accuracyScore * ACCURACY_WEIGHT) / 100;
+        uint256 weightedVolume = (volumeBonus * VOLUME_WEIGHT) / 100;
+
+        // Apply time decay
+        uint256 rawScore = ((weightedAccuracy + weightedVolume) * timeDecayFactor) / 100;
+
+        // Ensure score is within bounds
+        if (rawScore < MIN_SCORE) return MIN_SCORE;
+        if (rawScore > MAX_SCORE) return MAX_SCORE;
+
+        return uint16(rawScore);
+    }
+
+    /*///////////////////////////
+        PURE FUNCTIONS
+    ///////////////////////////*/
+
+    /**
+     * @notice Calculate volume bonus based on total challenges
+     * @param totalChallenges Total challenges attempted
+     * @return bonus Volume bonus (0-200)
+     */
+    function calculateVolumeBonus(uint32 totalChallenges) public pure returns (uint256) {
+        if (totalChallenges == 0) return 0;
+
+        // Using approximation of square root for gas efficiency
+        // sqrt(n) * 10, capped at 200
+        uint256 bonus = sqrt(totalChallenges) * 10;
+        return bonus > 200 ? 200 : bonus;
+    }
+
+    /**
+     * @notice Calculate time decay factor based on last activity
+     * @param lastActivityTime Timestamp of last activity
+     * @return decayFactor Factor from 50-100 (representing 50%-100%)
+     */
+    function calculateTimeDecay(uint64 lastActivityTime) public view returns (uint256) {
+        uint64 timeSinceActivity = uint64(block.timestamp) - lastActivityTime;
+
+        // Recent activity (0-30 days): 100% weight
+        if (timeSinceActivity < RECENT_PERIOD) {
+            return 100;
+        }
+
+        // Mid-term activity (30-60 days): 75% weight
+        if (timeSinceActivity < MID_PERIOD) {
+            return 75;
+        }
+
+        // Old activity (60+ days): 50% weight (minimum to prevent score from going too low)
+        return 50;
+    }
+
+    /*///////////////////////////
+      INTERNAL FUNCTIONS
+    ///////////////////////////*/
+
+    /**
+     * @notice Integer square root using Babylonian method
+     * @param x Input value
+     * @return y Square root of x
+     */
+    function sqrt(uint256 x) internal pure returns (uint256) {
+        if (x == 0) return 0;
+
+        uint256 z = (x + 1) / 2;
+        uint256 y = x;
+
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+
+        return y;
     }
 }

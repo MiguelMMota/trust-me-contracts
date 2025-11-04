@@ -10,6 +10,22 @@ import "./User.sol";
  * @dev Stores question hashes on-chain, full questions stored off-chain (IPFS/events)
  */
 contract Challenge {
+    /*///////////////////////////
+           ERRORS
+    ///////////////////////////*/
+
+    error Unauthorized();
+    error ChallengeNotFound();
+    error ChallengeNotActive();
+    error InvalidTopic();
+    error AlreadyAttempted();
+    error UserNotRegistered();
+    error EmptyHash();
+
+    /*///////////////////////////
+      TYPE DECLARATIONS
+    ///////////////////////////*/
+
     enum DifficultyLevel {
         Easy,      // +5-10 score on correct
         Medium,    // +10-20 score on correct
@@ -44,7 +60,10 @@ contract Challenge {
         uint64 attemptedAt;
     }
 
-    // State variables
+    /*///////////////////////////
+       STATE VARIABLES
+    ///////////////////////////*/
+
     mapping(uint64 => ChallengeData) public challenges;
     mapping(address => mapping(uint64 => ChallengeAttempt)) public userAttempts; // user => challengeId => attempt
     mapping(address => uint64[]) public userChallengeHistory; // user => challengeIds[]
@@ -55,7 +74,10 @@ contract Challenge {
     User public immutable userContract;
     address public reputationEngine;
 
-    // Events
+    /*///////////////////////////
+           EVENTS
+    ///////////////////////////*/
+
     event ChallengeCreated(
         uint64 indexed challengeId,
         address indexed creator,
@@ -70,25 +92,28 @@ contract Challenge {
     );
     event ChallengeStatusUpdated(uint64 indexed challengeId, ChallengeStatus newStatus);
 
-    // Errors
-    error Unauthorized();
-    error ChallengeNotFound();
-    error ChallengeNotActive();
-    error InvalidTopic();
-    error AlreadyAttempted();
-    error UserNotRegistered();
-    error EmptyHash();
+    /*///////////////////////////
+         MODIFIERS
+    ///////////////////////////*/
 
     modifier onlyReputationEngine() {
         if (msg.sender != reputationEngine) revert Unauthorized();
         _;
     }
 
+    /*///////////////////////////
+         CONSTRUCTOR
+    ///////////////////////////*/
+
     constructor(address _topicRegistry, address _userContract) {
         topicRegistry = TopicRegistry(_topicRegistry);
         userContract = User(_userContract);
         challengeCount = 0;
     }
+
+    /*///////////////////////////
+      EXTERNAL FUNCTIONS
+    ///////////////////////////*/
 
     /**
      * @notice Set reputation engine address (one-time)
@@ -195,6 +220,10 @@ contract Challenge {
         emit ChallengeStatusUpdated(challengeId, newStatus);
     }
 
+    /*///////////////////////////
+        VIEW FUNCTIONS
+    ///////////////////////////*/
+
     /**
      * @notice Get challenge data
      * @param challengeId Challenge ID
@@ -245,6 +274,10 @@ contract Challenge {
     function hasAttempted(address user, uint64 challengeId) external view returns (bool) {
         return userAttempts[user][challengeId].attemptedAt != 0;
     }
+
+    /*///////////////////////////
+        PURE FUNCTIONS
+    ///////////////////////////*/
 
     /**
      * @notice Get challenge difficulty multiplier for scoring

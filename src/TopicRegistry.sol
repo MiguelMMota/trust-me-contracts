@@ -7,6 +7,20 @@ pragma solidity ^0.8.24;
  * @dev Topics can have parent-child relationships (e.g., Tech -> Software -> Backend -> Python)
  */
 contract TopicRegistry {
+    /*///////////////////////////
+           ERRORS
+    ///////////////////////////*/
+
+    error Unauthorized();
+    error TopicNotFound();
+    error TopicAlreadyExists();
+    error InvalidParentTopic();
+    error TopicNameEmpty();
+
+    /*///////////////////////////
+      TYPE DECLARATIONS
+    ///////////////////////////*/
+
     struct Topic {
         uint32 id;
         string name;
@@ -15,34 +29,45 @@ contract TopicRegistry {
         uint64 createdAt;
     }
 
-    // State variables
+    /*///////////////////////////
+       STATE VARIABLES
+    ///////////////////////////*/
+
     mapping(uint32 => Topic) public topics;
     mapping(uint32 => uint32[]) public childTopics; // parentId => childIds[]
     mapping(string => uint32) public topicNameToId; // name => id (for lookups)
     uint32 public topicCount;
     address public admin;
 
-    // Events
+    /*///////////////////////////
+           EVENTS
+    ///////////////////////////*/
+
     event TopicCreated(uint32 indexed topicId, string name, uint32 indexed parentId);
     event TopicUpdated(uint32 indexed topicId, string name, bool isActive);
     event AdminTransferred(address indexed previousAdmin, address indexed newAdmin);
 
-    // Errors
-    error Unauthorized();
-    error TopicNotFound();
-    error TopicAlreadyExists();
-    error InvalidParentTopic();
-    error TopicNameEmpty();
+    /*///////////////////////////
+         MODIFIERS
+    ///////////////////////////*/
 
     modifier onlyAdmin() {
         if (msg.sender != admin) revert Unauthorized();
         _;
     }
 
+    /*///////////////////////////
+         CONSTRUCTOR
+    ///////////////////////////*/
+
     constructor() {
         admin = msg.sender;
         topicCount = 0;
     }
+
+    /*///////////////////////////
+      EXTERNAL FUNCTIONS
+    ///////////////////////////*/
 
     /**
      * @notice Create a new topic
@@ -88,6 +113,20 @@ contract TopicRegistry {
     }
 
     /**
+     * @notice Transfer admin rights
+     * @param newAdmin New admin address
+     */
+    function transferAdmin(address newAdmin) external onlyAdmin {
+        address previousAdmin = admin;
+        admin = newAdmin;
+        emit AdminTransferred(previousAdmin, newAdmin);
+    }
+
+    /*///////////////////////////
+        VIEW FUNCTIONS
+    ///////////////////////////*/
+
+    /**
      * @notice Get all child topics of a parent
      * @param parentId Parent topic ID
      * @return Array of child topic IDs
@@ -123,15 +162,9 @@ contract TopicRegistry {
         return childTopics[0];
     }
 
-    /**
-     * @notice Transfer admin rights
-     * @param newAdmin New admin address
-     */
-    function transferAdmin(address newAdmin) external onlyAdmin {
-        address previousAdmin = admin;
-        admin = newAdmin;
-        emit AdminTransferred(previousAdmin, newAdmin);
-    }
+    /*///////////////////////////
+       PUBLIC FUNCTIONS
+    ///////////////////////////*/
 
     /**
      * @notice Check if a topic is a descendant of another topic

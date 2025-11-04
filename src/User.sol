@@ -9,6 +9,19 @@ import "./TopicRegistry.sol";
  * @dev Uses efficient storage packing with uint16 for scores (0-1000 range)
  */
 contract User {
+    /*///////////////////////////
+           ERRORS
+    ///////////////////////////*/
+
+    error UserAlreadyRegistered();
+    error UserNotRegistered();
+    error Unauthorized();
+    error InvalidTopicId();
+
+    /*///////////////////////////
+      TYPE DECLARATIONS
+    ///////////////////////////*/
+
     // Packed struct: 2 per storage slot (128 bits each)
     struct UserTopicExpertise {
         uint16 score;              // 0-1000 expertise score
@@ -24,12 +37,15 @@ contract User {
         uint32 totalTopicsEngaged;
     }
 
+    /*///////////////////////////
+       STATE VARIABLES
+    ///////////////////////////*/
+
     // Constants
     uint16 public constant MIN_SCORE = 50;
     uint16 public constant MAX_SCORE = 1000;
     uint16 public constant INITIAL_SCORE = 50;
 
-    // State variables
     mapping(address => UserProfile) public userProfiles;
     mapping(address => mapping(uint32 => UserTopicExpertise)) public userExpertise; // user => topicId => expertise
     mapping(address => uint32[]) public userTopics; // user => engaged topic IDs
@@ -37,16 +53,17 @@ contract User {
     TopicRegistry public immutable topicRegistry;
     address public reputationEngine; // Will be set after ReputationEngine deployment
 
-    // Events
+    /*///////////////////////////
+           EVENTS
+    ///////////////////////////*/
+
     event UserRegistered(address indexed user, uint64 timestamp);
     event ExpertiseUpdated(address indexed user, uint32 indexed topicId, uint16 newScore);
     event ChallengeAttempted(address indexed user, uint32 indexed topicId, bool correct);
 
-    // Errors
-    error UserAlreadyRegistered();
-    error UserNotRegistered();
-    error Unauthorized();
-    error InvalidTopicId();
+    /*///////////////////////////
+         MODIFIERS
+    ///////////////////////////*/
 
     modifier onlyReputationEngine() {
         if (msg.sender != reputationEngine) revert Unauthorized();
@@ -58,9 +75,17 @@ contract User {
         _;
     }
 
+    /*///////////////////////////
+         CONSTRUCTOR
+    ///////////////////////////*/
+
     constructor(address _topicRegistry) {
         topicRegistry = TopicRegistry(_topicRegistry);
     }
+
+    /*///////////////////////////
+      EXTERNAL FUNCTIONS
+    ///////////////////////////*/
 
     /**
      * @notice Set the reputation engine address (can only be done once)
@@ -139,6 +164,10 @@ contract User {
         userExpertise[user][topicId].score = newScore;
         emit ExpertiseUpdated(user, topicId, newScore);
     }
+
+    /*///////////////////////////
+        VIEW FUNCTIONS
+    ///////////////////////////*/
 
     /**
      * @notice Get user's expertise in a specific topic
