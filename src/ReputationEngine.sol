@@ -150,14 +150,37 @@ contract ReputationEngine {
      * @param user User address
      * @param topicId Topic ID
      * @param wouldBeCorrect Whether the hypothetical answer would be correct
-     * @return projectedScore Projected score after the attempt
+     * @return projectedScore Projected score after the attempt (at current time)
      */
     function previewScoreChange(
         address user,
         uint32 topicId,
         bool wouldBeCorrect
     ) external view returns (uint16) {
+        return previewScoreChange(user, topicId, wouldBeCorrect, uint64(block.timestamp));
+    }
+
+    /**
+     * @notice Preview what score a user would have with an additional correct/incorrect answer at a specific time
+     * @param user User address
+     * @param topicId Topic ID
+     * @param wouldBeCorrect Whether the hypothetical answer would be correct
+     * @param scoreTime Time when the hypothetical attempt would occur
+     * @return projectedScore Projected score after the attempt
+     */
+    function previewScoreChange(
+        address user,
+        uint32 topicId,
+        bool wouldBeCorrect,
+        uint64 scoreTime
+    ) public view returns (uint16) {
         User.UserTopicExpertise memory expertise = userContract.getUserExpertise(user, topicId);
+
+        // Only include existing challenges if they occurred before scoreTime
+        if (expertise.lastActivityTime > scoreTime) {
+            // All existing challenges are after scoreTime, so only consider the new attempt
+            return MIN_SCORE; // Would be initial score after one attempt
+        }
 
         // Simulate the attempt
         uint32 newTotal = expertise.totalChallenges + 1;
@@ -169,7 +192,7 @@ contract ReputationEngine {
         // Calculate volume bonus with new total
         uint256 volumeBonus = calculateVolumeBonus(newTotal);
 
-        // Use current time for decay (assuming attempt happens now)
+        // Use scoreTime for decay calculation (assuming attempt happens at scoreTime)
         uint256 timeDecayFactor = 100; // Full weight for current attempt
 
         uint256 weightedAccuracy = (projectedAccuracy * ACCURACY_WEIGHT) / 100;
@@ -198,8 +221,24 @@ contract ReputationEngine {
         address user,
         uint32 topicId
     ) public view returns (uint16) {
-        uint16 challengeScore = calculateChallengeScore(user, topicId);
-        uint16 peerRatingScore = calculatePeerRatingScore(user, topicId);
+        return calculateExpertiseScore(user, topicId, uint64(block.timestamp));
+    }
+
+    /**
+     * @notice Calculate expertise score for a user in a topic at a specific time
+     * @param user User address
+     * @param topicId Topic ID
+     * @param scoreTime Calculate score as of this timestamp (defaults to current time)
+     * @return finalScore Calculated score (50-1000)
+     * @dev Combines challenge-based and peer rating scores, allowing max score via either path
+     */
+    function calculateExpertiseScore(
+        address user,
+        uint32 topicId,
+        uint64 scoreTime
+    ) public view returns (uint16) {
+        uint16 challengeScore = calculateChallengeScore(user, topicId, scoreTime);
+        uint16 peerRatingScore = calculatePeerRatingScore(user, topicId, scoreTime);
 
         // If neither score exists, return minimum
         if (challengeScore == 0 && peerRatingScore == 0) {
@@ -235,10 +274,27 @@ contract ReputationEngine {
         address user,
         uint32 topicId
     ) public view returns (uint16) {
+        return calculateChallengeScore(user, topicId, uint64(block.timestamp));
+    }
+
+    /**
+     * @notice Calculate challenge-based expertise score at a specific time
+     * @param user User address
+     * @param topicId Topic ID
+     * @param scoreTime Calculate score as of this timestamp
+     * @return score Challenge-based score (0-1000)
+     * @dev Note: Currently uses aggregate challenge data. Individual challenge filtering by time
+     *      would require additional data structures in User.sol
+     */
+    function calculateChallengeScore(
+        address user,
+        uint32 topicId,
+        uint64 scoreTime
+    ) public view returns (uint16) {
         User.UserTopicExpertise memory expertise = userContract.getUserExpertise(user, topicId);
 
-        // If no challenges attempted, return 0
-        if (expertise.totalChallenges == 0) {
+        // If no challenges attempted or last activity is after scoreTime, return 0
+        if (expertise.totalChallenges == 0 || expertise.lastActivityTime > scoreTime) {
             return 0;
         }
 
@@ -248,8 +304,8 @@ contract ReputationEngine {
         // Calculate volume bonus (0-200 points, using square root for diminishing returns)
         uint256 volumeBonus = calculateVolumeBonus(expertise.totalChallenges);
 
-        // Calculate time decay factor (reduces impact of old activity)
-        uint256 timeDecayFactor = calculateTimeDecay(expertise.lastActivityTime);
+        // Calculate time decay factor relative to scoreTime
+        uint256 timeDecayFactor = calculateTimeDecay(expertise.lastActivityTime, scoreTime);
 
         // Combine components with weights
         // accuracyScore is already 0-1000, volumeBonus is 0-200
@@ -276,14 +332,30 @@ contract ReputationEngine {
         address user,
         uint32 topicId
     ) public view returns (uint16) {
+        return calculatePeerRatingScore(user, topicId, uint64(block.timestamp));
+    }
+
+    /**
+     * @notice Calculate peer rating-based expertise score at a specific time
+     * @param user User address
+     * @param topicId Topic ID
+     * @param scoreTime Calculate score as of this timestamp
+     * @return score Peer rating score (0-1000)
+     */
+    function calculatePeerRatingScore(
+        address user,
+        uint32 topicId,
+        uint64 scoreTime
+    ) public view returns (uint16) {
         // Return 0 if peer rating contract not set
         if (address(peerRatingContract) == address(0)) {
             return 0;
         }
 
-        PeerRating.UserTopicRatings memory ratings = peerRatingContract.getUserTopicRating(user, topicId);
+        // Get ratings as they were at scoreTime
+        PeerRating.UserTopicRatings memory ratings = peerRatingContract.getUserTopicRatingAtTime(user, topicId, scoreTime);
 
-        // If no ratings received, return 0
+        // If no ratings received before scoreTime, return 0
         if (ratings.totalRatings == 0) {
             return 0;
         }
@@ -295,8 +367,8 @@ contract ReputationEngine {
         // More ratings = more reliable score
         uint256 ratingVolumeBonus = calculateRatingVolumeBonus(ratings.totalRatings);
 
-        // Apply time decay based on last rating time
-        uint256 timeDecayFactor = calculateTimeDecay(ratings.lastRatingTime);
+        // Apply time decay based on last rating time, relative to scoreTime
+        uint256 timeDecayFactor = calculateTimeDecay(ratings.lastRatingTime, scoreTime);
 
         // Combine base score with volume bonus
         // Base score weighted 80%, volume bonus weighted 20%
@@ -347,12 +419,27 @@ contract ReputationEngine {
     }
 
     /**
-     * @notice Calculate time decay factor based on last activity
+     * @notice Calculate time decay factor based on last activity (relative to current time)
      * @param lastActivityTime Timestamp of last activity
      * @return decayFactor Factor from 50-100 (representing 50%-100%)
      */
     function calculateTimeDecay(uint64 lastActivityTime) public view returns (uint256) {
-        uint64 timeSinceActivity = uint64(block.timestamp) - lastActivityTime;
+        return calculateTimeDecay(lastActivityTime, uint64(block.timestamp));
+    }
+
+    /**
+     * @notice Calculate time decay factor based on last activity relative to a specific time
+     * @param lastActivityTime Timestamp of last activity
+     * @param scoreTime Reference time for calculating decay
+     * @return decayFactor Factor from 50-100 (representing 50%-100%)
+     */
+    function calculateTimeDecay(uint64 lastActivityTime, uint64 scoreTime) public pure returns (uint256) {
+        // If last activity is after scoreTime, return 0 (shouldn't happen in normal usage)
+        if (lastActivityTime > scoreTime) {
+            return 0;
+        }
+
+        uint64 timeSinceActivity = scoreTime - lastActivityTime;
 
         // Recent activity (0-30 days): 100% weight
         if (timeSinceActivity < RECENT_PERIOD) {

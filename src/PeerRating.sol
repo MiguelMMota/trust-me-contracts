@@ -18,8 +18,8 @@ contract PeerRating {
     error InvalidTopicId();
     error SelfRatingNotAllowed();
     error InvalidRatingValue();
-    error RatingAlreadyExists();
     error RatingNotFound();
+    error RatedTooRecently(address, address, uint32, uint64);  // rater, ratee, topic, late rating timestamp
     error Unauthorized();
 
     /*///////////////////////////
@@ -48,11 +48,15 @@ contract PeerRating {
     // Constants
     uint16 public constant MIN_RATING = 0;
     uint16 public constant MAX_RATING = 1000;
+    uint64 public constant RATING_COOLDOWN_PERIOD = 182 days; // 6 months
 
-    // user => topicId => rater => Rating
-    mapping(address => mapping(uint32 => mapping(address => Rating))) public ratings;
+    // user => topicId => rater => timestamp => Rating
+    mapping(address => mapping(uint32 => mapping(address => mapping(uint64 => Rating)))) public ratings;
 
-    // user => topicId => aggregated ratings data
+    // user => topicId => rater => array of timestamps when they were rated
+    mapping(address => mapping(uint32 => mapping(address => uint64[]))) public ratingTimestamps;
+
+    // user => topicId => aggregated ratings data (at current time)
     mapping(address => mapping(uint32 => UserTopicRatings)) public userTopicRatings;
 
     // user => topicId => array of raters who rated them
@@ -130,7 +134,9 @@ contract PeerRating {
     }
 
     /**
-     * @notice Submit or update a rating for another user on a specific topic
+     * @notice Submit a new rating for another user on a specific topic
+     * @notice Raters can submit multiple ratings over time to reflect changes in expertise,
+     *   but only after a cooldown period
      * @param ratee Address of user being rated
      * @param topicId Topic ID
      * @param score Rating score (0-1000)
@@ -148,53 +154,77 @@ contract PeerRating {
         TopicRegistry.Topic memory topic = topicRegistry.getTopic(topicId);
         if (!topic.isActive) revert InvalidTopicId();
 
-        Rating storage rating = ratings[ratee][topicId][msg.sender];
-        bool isUpdate = rating.exists;
-        uint16 oldScore = rating.score;
+        uint64 timestamp = uint64(block.timestamp);
 
-        if (isUpdate) {
-            // Update existing rating
-            rating.score = score;
-            rating.timestamp = uint64(block.timestamp);
+        // Check if rater has rated before and enforce cooldown period
+        uint64[] storage timestamps = ratingTimestamps[ratee][topicId][msg.sender];
+        bool isFirstRatingFromRater = timestamps.length == 0;
 
-            emit RatingUpdated(msg.sender, ratee, topicId, oldScore, score, uint64(block.timestamp));
-        } else {
-            // Create new rating
-            rating.rater = msg.sender;
-            rating.ratee = ratee;
-            rating.topicId = topicId;
-            rating.score = score;
-            rating.timestamp = uint64(block.timestamp);
-            rating.exists = true;
+        if (!isFirstRatingFromRater) {
+            // Get the most recent rating timestamp
+            uint64 lastRatingTimestamp = timestamps[timestamps.length - 1];
+            uint64 earliestAllowedTimestamp = timestamp - RATING_COOLDOWN_PERIOD;
 
-            // Track this rater
+            // Check if cooldown period has passed
+            if (lastRatingTimestamp > earliestAllowedTimestamp) {
+                revert RatedTooRecently(msg.sender, ratee, topicId, lastRatingTimestamp);
+            }
+        }
+
+        // Create new rating entry at this timestamp
+        Rating storage rating = ratings[ratee][topicId][msg.sender][timestamp];
+        rating.rater = msg.sender;
+        rating.ratee = ratee;
+        rating.topicId = topicId;
+        rating.score = score;
+        rating.timestamp = timestamp;
+        rating.exists = true;
+
+        // Track this timestamp
+        timestamps.push(timestamp);
+
+        // Track this rater if first time rating this user on this topic
+        if (isFirstRatingFromRater) {
             topicRaters[ratee][topicId].push(msg.sender);
 
-            // Track this topic if first rating
+            // Track this topic if first rating ever received
             if (userTopicRatings[ratee][topicId].totalRatings == 0) {
                 userRatedTopics[ratee].push(topicId);
             }
-
-            emit RatingSubmitted(msg.sender, ratee, topicId, score, uint64(block.timestamp));
         }
 
-        // Update aggregate ratings
-        _updateAggregateRating(ratee, topicId);
+        // Emit appropriate event
+        if (isFirstRatingFromRater) {
+            emit RatingSubmitted(msg.sender, ratee, topicId, score, timestamp);
+        } else {
+            // This is an amendment - get the previous rating
+            uint64 previousTimestamp = timestamps[timestamps.length - 2];
+            uint16 oldScore = ratings[ratee][topicId][msg.sender][previousTimestamp].score;
+            emit RatingUpdated(msg.sender, ratee, topicId, oldScore, score, timestamp);
+        }
+
+        // Update aggregate ratings (at current time)
+        _updateAggregateRating(ratee, topicId, block.timestamp);
     }
 
     /**
-     * @notice Internal function to recalculate aggregate rating for a user on a topic
+     * @notice Internal function to recalculate aggregate rating for a user on a topic at a specific time
      * @param user User address
      * @param topicId Topic ID
+     * @param scoreTime Calculate ratings as of this timestamp
      */
-    function _updateAggregateRating(address user, uint32 topicId) internal {
+    function _updateAggregateRating(address user, uint32 topicId, uint256 scoreTime) internal {
         address[] memory raters = topicRaters[user][topicId];
         uint256 totalScore = 0;
         uint256 validRatings = 0;
         uint64 mostRecentTime = 0;
 
         for (uint256 i = 0; i < raters.length; i++) {
-            Rating memory rating = ratings[user][topicId][raters[i]];
+            address rater = raters[i];
+
+            // Get the most recent rating from this rater before scoreTime
+            Rating memory rating = _getMostRecentRatingBefore(user, topicId, rater, scoreTime);
+
             if (rating.exists) {
                 totalScore += rating.score;
                 validRatings++;
@@ -215,27 +245,129 @@ contract PeerRating {
         emit AggregateRatingUpdated(user, topicId, averageScore, uint32(validRatings));
     }
 
+    /**
+     * @notice Get the most recent rating from a rater before a specific time
+     * @param ratee User who received the rating
+     * @param topicId Topic ID
+     * @param rater User who gave the rating
+     * @param beforeTime Only consider ratings before this timestamp
+     * @return rating The most recent Rating before the specified time
+     */
+    function _getMostRecentRatingBefore(
+        address ratee,
+        uint32 topicId,
+        address rater,
+        uint256 beforeTime
+    ) internal view returns (Rating memory) {
+        uint64[] memory timestamps = ratingTimestamps[ratee][topicId][rater];
+
+        // Return empty rating if no timestamps
+        if (timestamps.length == 0) {
+            return Rating({
+                rater: address(0),
+                ratee: address(0),
+                topicId: 0,
+                score: 0,
+                timestamp: 0,
+                exists: false
+            });
+        }
+
+        // Find the most recent timestamp before scoreTime
+        uint64 mostRecentTimestamp = 0;
+        bool found = false;
+
+        for (uint256 i = 0; i < timestamps.length; i++) {
+            if (timestamps[i] <= beforeTime && timestamps[i] > mostRecentTimestamp) {
+                mostRecentTimestamp = timestamps[i];
+                found = true;
+            }
+        }
+
+        if (!found) {
+            return Rating({
+                rater: address(0),
+                ratee: address(0),
+                topicId: 0,
+                score: 0,
+                timestamp: 0,
+                exists: false
+            });
+        }
+
+        return ratings[ratee][topicId][rater][mostRecentTimestamp];
+    }
+
     /*///////////////////////////
         VIEW FUNCTIONS
     ///////////////////////////*/
 
     /**
-     * @notice Get a specific rating from one user to another on a topic
+     * @notice Get the most recent rating from one user to another on a topic (at current time)
      * @param ratee User who received the rating
      * @param topicId Topic ID
      * @param rater User who gave the rating
-     * @return Rating struct
+     * @return Rating struct (most recent)
      */
     function getRating(
         address ratee,
         uint32 topicId,
         address rater
     ) external view returns (Rating memory) {
-        return ratings[ratee][topicId][rater];
+        return _getMostRecentRatingBefore(ratee, topicId, rater, block.timestamp);
     }
 
     /**
-     * @notice Get aggregate ratings for a user on a topic
+     * @notice Get a rating from one user to another on a topic at a specific timestamp
+     * @param ratee User who received the rating
+     * @param topicId Topic ID
+     * @param rater User who gave the rating
+     * @param timestamp Specific timestamp of the rating
+     * @return Rating struct at that exact timestamp
+     */
+    function getRatingAtTimestamp(
+        address ratee,
+        uint32 topicId,
+        address rater,
+        uint64 timestamp
+    ) external view returns (Rating memory) {
+        return ratings[ratee][topicId][rater][timestamp];
+    }
+
+    /**
+     * @notice Get the most recent rating from a rater before a specific time
+     * @param ratee User who received the rating
+     * @param topicId Topic ID
+     * @param rater User who gave the rating
+     * @param scoreTime Get rating as of this timestamp
+     * @return Rating struct (most recent before scoreTime)
+     */
+    function getRatingAtTime(
+        address ratee,
+        uint32 topicId,
+        address rater,
+        uint64 scoreTime
+    ) external view returns (Rating memory) {
+        return _getMostRecentRatingBefore(ratee, topicId, rater, scoreTime);
+    }
+
+    /**
+     * @notice Get all timestamps when a rater rated a user on a topic
+     * @param ratee User who received the rating
+     * @param topicId Topic ID
+     * @param rater User who gave the rating
+     * @return Array of timestamps
+     */
+    function getRatingTimestamps(
+        address ratee,
+        uint32 topicId,
+        address rater
+    ) external view returns (uint64[] memory) {
+        return ratingTimestamps[ratee][topicId][rater];
+    }
+
+    /**
+     * @notice Get aggregate ratings for a user on a topic (at current time)
      * @param user User address
      * @param topicId Topic ID
      * @return UserTopicRatings struct
@@ -245,6 +377,47 @@ contract PeerRating {
         uint32 topicId
     ) external view returns (UserTopicRatings memory) {
         return userTopicRatings[user][topicId];
+    }
+
+    /**
+     * @notice Get aggregate ratings for a user on a topic at a specific time
+     * @param user User address
+     * @param topicId Topic ID
+     * @param scoreTime Calculate ratings as of this timestamp
+     * @return UserTopicRatings struct calculated at scoreTime
+     */
+    function getUserTopicRatingAtTime(
+        address user,
+        uint32 topicId,
+        uint64 scoreTime
+    ) external view returns (UserTopicRatings memory) {
+        address[] memory raters = topicRaters[user][topicId];
+        uint256 totalScore = 0;
+        uint256 validRatings = 0;
+        uint64 mostRecentTime = 0;
+
+        for (uint256 i = 0; i < raters.length; i++) {
+            address rater = raters[i];
+
+            // Get the most recent rating from this rater before scoreTime
+            Rating memory rating = _getMostRecentRatingBefore(user, topicId, rater, scoreTime);
+
+            if (rating.exists) {
+                totalScore += rating.score;
+                validRatings++;
+                if (rating.timestamp > mostRecentTime) {
+                    mostRecentTime = rating.timestamp;
+                }
+            }
+        }
+
+        uint16 averageScore = validRatings > 0 ? uint16(totalScore / validRatings) : 0;
+
+        return UserTopicRatings({
+            averageScore: averageScore,
+            totalRatings: uint32(validRatings),
+            lastRatingTime: mostRecentTime
+        });
     }
 
     /**
@@ -287,17 +460,34 @@ contract PeerRating {
     }
 
     /**
-     * @notice Check if a rating exists from rater to ratee on a topic
+     * @notice Check if a rating exists from rater to ratee on a topic (at current time)
      * @param ratee User who received the rating
      * @param topicId Topic ID
      * @param rater User who gave the rating
-     * @return true if rating exists
+     * @return true if any rating exists from this rater
      */
     function ratingExists(
         address ratee,
         uint32 topicId,
         address rater
     ) external view returns (bool) {
-        return ratings[ratee][topicId][rater].exists;
+        return ratingTimestamps[ratee][topicId][rater].length > 0;
+    }
+
+    /**
+     * @notice Check if a rating exists at a specific timestamp
+     * @param ratee User who received the rating
+     * @param topicId Topic ID
+     * @param rater User who gave the rating
+     * @param timestamp Specific timestamp to check
+     * @return true if rating exists at that timestamp
+     */
+    function ratingExistsAtTimestamp(
+        address ratee,
+        uint32 topicId,
+        address rater,
+        uint64 timestamp
+    ) external view returns (bool) {
+        return ratings[ratee][topicId][rater][timestamp].exists;
     }
 }
