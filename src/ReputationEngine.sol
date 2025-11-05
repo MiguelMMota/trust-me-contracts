@@ -5,13 +5,16 @@ import "./User.sol";
 import "./Challenge.sol";
 import "./TopicRegistry.sol";
 import "./PeerRating.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /**
  * @title ReputationEngine
  * @notice Calculates and updates user expertise scores based on challenge performance and peer ratings
  * @dev Implements time-weighted scoring with accuracy, volume, and peer rating factors
  */
-contract ReputationEngine {
+contract ReputationEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /*///////////////////////////
            ERRORS
     ///////////////////////////*/
@@ -26,38 +29,45 @@ contract ReputationEngine {
     // Constants for scoring algorithm
     uint16 public constant MIN_SCORE = 50;
     uint16 public constant MAX_SCORE = 1000;
-    uint16 public constant ACCURACY_WEIGHT = 70;  // 70% weight
-    uint16 public constant VOLUME_WEIGHT = 30;    // 30% weight
+    uint16 public constant ACCURACY_WEIGHT = 70; // 70% weight
+    uint16 public constant VOLUME_WEIGHT = 30; // 30% weight
 
     // Time decay periods (in seconds)
     uint64 public constant RECENT_PERIOD = 30 days;
     uint64 public constant MID_PERIOD = 60 days;
 
-    User public immutable userContract;
-    Challenge public immutable challengeContract;
-    TopicRegistry public immutable topicRegistry;
+    User public userContract;
+    Challenge public challengeContract;
+    TopicRegistry public topicRegistry;
     PeerRating public peerRatingContract; // Set after deployment
 
     /*///////////////////////////
            EVENTS
     ///////////////////////////*/
 
-    event ScoreCalculated(
-        address indexed user,
-        uint32 indexed topicId,
-        uint16 oldScore,
-        uint16 newScore
-    );
+    event ScoreCalculated(address indexed user, uint32 indexed topicId, uint16 oldScore, uint16 newScore);
 
     /*///////////////////////////
          CONSTRUCTOR
     ///////////////////////////*/
 
-    constructor(
-        address _userContract,
-        address _challengeContract,
-        address _topicRegistry
-    ) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @notice Initialize the contract
+     * @param initialOwner The address that will own this contract
+     * @param _userContract Address of the User contract
+     * @param _challengeContract Address of the Challenge contract
+     * @param _topicRegistry Address of the TopicRegistry contract
+     */
+    function initialize(address initialOwner, address _userContract, address _challengeContract, address _topicRegistry)
+        external
+        initializer
+    {
+        __Ownable_init(initialOwner);
         userContract = User(_userContract);
         challengeContract = Challenge(_challengeContract);
         topicRegistry = TopicRegistry(_topicRegistry);
@@ -71,7 +81,7 @@ contract ReputationEngine {
      * @notice Set the peer rating contract address (can only be done once)
      * @param _peerRatingContract Address of the PeerRating contract
      */
-    function setPeerRatingContract(address _peerRatingContract) external {
+    function setPeerRatingContract(address _peerRatingContract) external onlyOwner {
         if (address(peerRatingContract) != address(0)) revert Unauthorized();
         peerRatingContract = PeerRating(_peerRatingContract);
     }
@@ -152,11 +162,7 @@ contract ReputationEngine {
      * @param wouldBeCorrect Whether the hypothetical answer would be correct
      * @return projectedScore Projected score after the attempt (at current time)
      */
-    function previewScoreChange(
-        address user,
-        uint32 topicId,
-        bool wouldBeCorrect
-    ) external view returns (uint16) {
+    function previewScoreChange(address user, uint32 topicId, bool wouldBeCorrect) external view returns (uint16) {
         return previewScoreChange(user, topicId, wouldBeCorrect, uint64(block.timestamp));
     }
 
@@ -168,12 +174,11 @@ contract ReputationEngine {
      * @param scoreTime Time when the hypothetical attempt would occur
      * @return projectedScore Projected score after the attempt
      */
-    function previewScoreChange(
-        address user,
-        uint32 topicId,
-        bool wouldBeCorrect,
-        uint64 scoreTime
-    ) public view returns (uint16) {
+    function previewScoreChange(address user, uint32 topicId, bool wouldBeCorrect, uint64 scoreTime)
+        public
+        view
+        returns (uint16)
+    {
         User.UserTopicExpertise memory expertise = userContract.getUserExpertise(user, topicId);
 
         // Only include existing challenges if they occurred before scoreTime
@@ -217,10 +222,7 @@ contract ReputationEngine {
      * @return finalScore Calculated score (50-1000)
      * @dev Combines challenge-based and peer rating scores, allowing max score via either path
      */
-    function calculateExpertiseScore(
-        address user,
-        uint32 topicId
-    ) public view returns (uint16) {
+    function calculateExpertiseScore(address user, uint32 topicId) public view returns (uint16) {
         return calculateExpertiseScore(user, topicId, uint64(block.timestamp));
     }
 
@@ -232,11 +234,7 @@ contract ReputationEngine {
      * @return finalScore Calculated score (50-1000)
      * @dev Combines challenge-based and peer rating scores, allowing max score via either path
      */
-    function calculateExpertiseScore(
-        address user,
-        uint32 topicId,
-        uint64 scoreTime
-    ) public view returns (uint16) {
+    function calculateExpertiseScore(address user, uint32 topicId, uint64 scoreTime) public view returns (uint16) {
         uint16 challengeScore = calculateChallengeScore(user, topicId, scoreTime);
         uint16 peerRatingScore = calculatePeerRatingScore(user, topicId, scoreTime);
 
@@ -270,10 +268,7 @@ contract ReputationEngine {
      * @param topicId Topic ID
      * @return score Challenge-based score (0-1000)
      */
-    function calculateChallengeScore(
-        address user,
-        uint32 topicId
-    ) public view returns (uint16) {
+    function calculateChallengeScore(address user, uint32 topicId) public view returns (uint16) {
         return calculateChallengeScore(user, topicId, uint64(block.timestamp));
     }
 
@@ -286,11 +281,7 @@ contract ReputationEngine {
      * @dev Note: Currently uses aggregate challenge data. Individual challenge filtering by time
      *      would require additional data structures in User.sol
      */
-    function calculateChallengeScore(
-        address user,
-        uint32 topicId,
-        uint64 scoreTime
-    ) public view returns (uint16) {
+    function calculateChallengeScore(address user, uint32 topicId, uint64 scoreTime) public view returns (uint16) {
         User.UserTopicExpertise memory expertise = userContract.getUserExpertise(user, topicId);
 
         // If no challenges attempted or last activity is after scoreTime, return 0
@@ -328,10 +319,7 @@ contract ReputationEngine {
      * @param topicId Topic ID
      * @return score Peer rating score (0-1000)
      */
-    function calculatePeerRatingScore(
-        address user,
-        uint32 topicId
-    ) public view returns (uint16) {
+    function calculatePeerRatingScore(address user, uint32 topicId) public view returns (uint16) {
         return calculatePeerRatingScore(user, topicId, uint64(block.timestamp));
     }
 
@@ -342,18 +330,15 @@ contract ReputationEngine {
      * @param scoreTime Calculate score as of this timestamp
      * @return score Peer rating score (0-1000)
      */
-    function calculatePeerRatingScore(
-        address user,
-        uint32 topicId,
-        uint64 scoreTime
-    ) public view returns (uint16) {
+    function calculatePeerRatingScore(address user, uint32 topicId, uint64 scoreTime) public view returns (uint16) {
         // Return 0 if peer rating contract not set
         if (address(peerRatingContract) == address(0)) {
             return 0;
         }
 
         // Get ratings as they were at scoreTime
-        PeerRating.UserTopicRatings memory ratings = peerRatingContract.getUserTopicRatingAtTime(user, topicId, scoreTime);
+        PeerRating.UserTopicRatings memory ratings =
+            peerRatingContract.getUserTopicRatingAtTime(user, topicId, scoreTime);
 
         // If no ratings received before scoreTime, return 0
         if (ratings.totalRatings == 0) {
@@ -477,4 +462,14 @@ contract ReputationEngine {
 
         return y;
     }
+
+    /*///////////////////////////
+      INTERNAL FUNCTIONS
+    ///////////////////////////*/
+
+    /**
+     * @notice Authorize contract upgrade
+     * @dev Only owner can upgrade the contract
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

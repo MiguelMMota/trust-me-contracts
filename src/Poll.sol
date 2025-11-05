@@ -4,13 +4,16 @@ pragma solidity ^0.8.24;
 import "./User.sol";
 import "./ReputationEngine.sol";
 import "./TopicRegistry.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /**
  * @title Poll
  * @notice Weighted voting system where vote weight is proportional to expertise
  * @dev Supports multiple-choice polls with expertise-weighted results
  */
-contract Poll {
+contract Poll is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /*///////////////////////////
            ERRORS
     ///////////////////////////*/
@@ -54,15 +57,15 @@ contract Poll {
     struct PollOption {
         uint8 optionId;
         string optionText;
-        uint256 totalWeight;    // Sum of all weighted votes for this option
-        uint32 voteCount;       // Number of votes (unweighted count)
+        uint256 totalWeight; // Sum of all weighted votes for this option
+        uint32 voteCount; // Number of votes (unweighted count)
     }
 
     struct Vote {
         address voter;
         uint64 pollId;
         uint8 selectedOption;
-        uint256 weight;         // Voter's expertise score at time of vote
+        uint256 weight; // Voter's expertise score at time of vote
         uint64 votedAt;
     }
 
@@ -87,27 +90,18 @@ contract Poll {
 
     uint64 public pollCount;
 
-    User public immutable userContract;
-    ReputationEngine public immutable reputationEngine;
-    TopicRegistry public immutable topicRegistry;
+    User public userContract;
+    ReputationEngine public reputationEngine;
+    TopicRegistry public topicRegistry;
 
     /*///////////////////////////
            EVENTS
     ///////////////////////////*/
 
     event PollCreated(
-        uint64 indexed pollId,
-        address indexed creator,
-        uint32 indexed topicId,
-        string question,
-        uint64 endTime
+        uint64 indexed pollId, address indexed creator, uint32 indexed topicId, string question, uint64 endTime
     );
-    event VoteCast(
-        uint64 indexed pollId,
-        address indexed voter,
-        uint8 optionId,
-        uint256 weight
-    );
+    event VoteCast(uint64 indexed pollId, address indexed voter, uint8 optionId, uint256 weight);
     event PollClosed(uint64 indexed pollId);
     event PollFinalized(uint64 indexed pollId, uint8 winningOption);
 
@@ -115,11 +109,23 @@ contract Poll {
          CONSTRUCTOR
     ///////////////////////////*/
 
-    constructor(
-        address _userContract,
-        address _reputationEngine,
-        address _topicRegistry
-    ) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @notice Initialize the contract
+     * @param initialOwner The address that will own this contract
+     * @param _userContract Address of the User contract
+     * @param _reputationEngine Address of the ReputationEngine contract
+     * @param _topicRegistry Address of the TopicRegistry contract
+     */
+    function initialize(address initialOwner, address _userContract, address _reputationEngine, address _topicRegistry)
+        external
+        initializer
+    {
+        __Ownable_init(initialOwner);
         userContract = User(_userContract);
         reputationEngine = ReputationEngine(_reputationEngine);
         topicRegistry = TopicRegistry(_topicRegistry);
@@ -138,12 +144,10 @@ contract Poll {
      * @param durationInDays Poll duration in days
      * @return pollId The ID of the created poll
      */
-    function createPoll(
-        uint32 topicId,
-        string calldata question,
-        string[] calldata options,
-        uint64 durationInDays
-    ) external returns (uint64) {
+    function createPoll(uint32 topicId, string calldata question, string[] calldata options, uint64 durationInDays)
+        external
+        returns (uint64)
+    {
         if (!userContract.isRegistered(msg.sender)) revert UserNotRegistered();
         if (options.length < 2) revert TooFewOptions();
         if (options.length > 10) revert TooManyOptions();
@@ -172,12 +176,7 @@ contract Poll {
 
         // Create poll options
         for (uint8 i = 0; i < options.length; i++) {
-            pollOptions[newPollId][i] = PollOption({
-                optionId: i,
-                optionText: options[i],
-                totalWeight: 0,
-                voteCount: 0
-            });
+            pollOptions[newPollId][i] = PollOption({optionId: i, optionText: options[i], totalWeight: 0, voteCount: 0});
         }
 
         userPolls[msg.sender].push(newPollId);
@@ -421,4 +420,14 @@ contract Poll {
 
         return percentages;
     }
+
+    /*///////////////////////////
+      INTERNAL FUNCTIONS
+    ///////////////////////////*/
+
+    /**
+     * @notice Authorize contract upgrade
+     * @dev Only owner can upgrade the contract
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

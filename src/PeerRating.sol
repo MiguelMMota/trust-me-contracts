@@ -3,13 +3,16 @@ pragma solidity ^0.8.24;
 
 import "./TopicRegistry.sol";
 import "./User.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /**
  * @title PeerRating
  * @notice Manages peer-to-peer reputation ratings across topics
  * @dev Allows users to rate each other's expertise, complementing challenge-based scoring
  */
-contract PeerRating {
+contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /*///////////////////////////
            ERRORS
     ///////////////////////////*/
@@ -19,7 +22,7 @@ contract PeerRating {
     error SelfRatingNotAllowed();
     error InvalidRatingValue();
     error RatingNotFound();
-    error RatedTooRecently(address, address, uint32, uint64);  // rater, ratee, topic, late rating timestamp
+    error RatedTooRecently(address, address, uint32, uint64); // rater, ratee, topic, late rating timestamp
     error Unauthorized();
 
     /*///////////////////////////
@@ -27,18 +30,18 @@ contract PeerRating {
     ///////////////////////////*/
 
     struct Rating {
-        address rater;         // Who gave the rating
-        address ratee;         // Who received the rating
-        uint32 topicId;        // Topic the rating is for
-        uint16 score;          // Rating score (0-1000)
-        uint64 timestamp;      // When the rating was given
-        bool exists;           // Whether this rating exists
+        address rater; // Who gave the rating
+        address ratee; // Who received the rating
+        uint32 topicId; // Topic the rating is for
+        uint16 score; // Rating score (0-1000)
+        uint64 timestamp; // When the rating was given
+        bool exists; // Whether this rating exists
     }
 
     struct UserTopicRatings {
-        uint16 averageScore;      // Average rating received (0-1000)
-        uint32 totalRatings;      // Number of ratings received
-        uint64 lastRatingTime;    // Last time user was rated (for time decay)
+        uint16 averageScore; // Average rating received (0-1000)
+        uint32 totalRatings; // Number of ratings received
+        uint64 lastRatingTime; // Last time user was rated (for time decay)
     }
 
     /*///////////////////////////
@@ -65,8 +68,8 @@ contract PeerRating {
     // user => topics they've been rated on
     mapping(address => uint32[]) public userRatedTopics;
 
-    TopicRegistry public immutable topicRegistry;
-    User public immutable userContract;
+    TopicRegistry public topicRegistry;
+    User public userContract;
     address public reputationEngine; // Will be set after ReputationEngine deployment
 
     /*///////////////////////////
@@ -74,11 +77,7 @@ contract PeerRating {
     ///////////////////////////*/
 
     event RatingSubmitted(
-        address indexed rater,
-        address indexed ratee,
-        uint32 indexed topicId,
-        uint16 score,
-        uint64 timestamp
+        address indexed rater, address indexed ratee, uint32 indexed topicId, uint16 score, uint64 timestamp
     );
 
     event RatingUpdated(
@@ -91,10 +90,7 @@ contract PeerRating {
     );
 
     event AggregateRatingUpdated(
-        address indexed user,
-        uint32 indexed topicId,
-        uint16 newAverageScore,
-        uint32 totalRatings
+        address indexed user, uint32 indexed topicId, uint16 newAverageScore, uint32 totalRatings
     );
 
     /*///////////////////////////
@@ -115,7 +111,19 @@ contract PeerRating {
          CONSTRUCTOR
     ///////////////////////////*/
 
-    constructor(address _topicRegistry, address _userContract) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @notice Initialize the contract
+     * @param initialOwner The address that will own this contract
+     * @param _topicRegistry Address of the TopicRegistry contract
+     * @param _userContract Address of the User contract
+     */
+    function initialize(address initialOwner, address _topicRegistry, address _userContract) external initializer {
+        __Ownable_init(initialOwner);
         topicRegistry = TopicRegistry(_topicRegistry);
         userContract = User(_userContract);
     }
@@ -128,7 +136,7 @@ contract PeerRating {
      * @notice Set the reputation engine address (can only be done once)
      * @param _reputationEngine Address of the ReputationEngine contract
      */
-    function setReputationEngine(address _reputationEngine) external {
+    function setReputationEngine(address _reputationEngine) external onlyOwner {
         if (reputationEngine != address(0)) revert Unauthorized();
         reputationEngine = _reputationEngine;
     }
@@ -141,11 +149,11 @@ contract PeerRating {
      * @param topicId Topic ID
      * @param score Rating score (0-1000)
      */
-    function rateUser(
-        address ratee,
-        uint32 topicId,
-        uint16 score
-    ) external onlyRegistered(msg.sender) onlyRegistered(ratee) {
+    function rateUser(address ratee, uint32 topicId, uint16 score)
+        external
+        onlyRegistered(msg.sender)
+        onlyRegistered(ratee)
+    {
         // Validate inputs
         if (msg.sender == ratee) revert SelfRatingNotAllowed();
         if (score > MAX_RATING) revert InvalidRatingValue();
@@ -253,24 +261,16 @@ contract PeerRating {
      * @param beforeTime Only consider ratings before this timestamp
      * @return rating The most recent Rating before the specified time
      */
-    function _getMostRecentRatingBefore(
-        address ratee,
-        uint32 topicId,
-        address rater,
-        uint256 beforeTime
-    ) internal view returns (Rating memory) {
+    function _getMostRecentRatingBefore(address ratee, uint32 topicId, address rater, uint256 beforeTime)
+        internal
+        view
+        returns (Rating memory)
+    {
         uint64[] memory timestamps = ratingTimestamps[ratee][topicId][rater];
 
         // Return empty rating if no timestamps
         if (timestamps.length == 0) {
-            return Rating({
-                rater: address(0),
-                ratee: address(0),
-                topicId: 0,
-                score: 0,
-                timestamp: 0,
-                exists: false
-            });
+            return Rating({rater: address(0), ratee: address(0), topicId: 0, score: 0, timestamp: 0, exists: false});
         }
 
         // Find the most recent timestamp before scoreTime
@@ -285,14 +285,7 @@ contract PeerRating {
         }
 
         if (!found) {
-            return Rating({
-                rater: address(0),
-                ratee: address(0),
-                topicId: 0,
-                score: 0,
-                timestamp: 0,
-                exists: false
-            });
+            return Rating({rater: address(0), ratee: address(0), topicId: 0, score: 0, timestamp: 0, exists: false});
         }
 
         return ratings[ratee][topicId][rater][mostRecentTimestamp];
@@ -309,11 +302,7 @@ contract PeerRating {
      * @param rater User who gave the rating
      * @return Rating struct (most recent)
      */
-    function getRating(
-        address ratee,
-        uint32 topicId,
-        address rater
-    ) external view returns (Rating memory) {
+    function getRating(address ratee, uint32 topicId, address rater) external view returns (Rating memory) {
         return _getMostRecentRatingBefore(ratee, topicId, rater, block.timestamp);
     }
 
@@ -325,12 +314,11 @@ contract PeerRating {
      * @param timestamp Specific timestamp of the rating
      * @return Rating struct at that exact timestamp
      */
-    function getRatingAtTimestamp(
-        address ratee,
-        uint32 topicId,
-        address rater,
-        uint64 timestamp
-    ) external view returns (Rating memory) {
+    function getRatingAtTimestamp(address ratee, uint32 topicId, address rater, uint64 timestamp)
+        external
+        view
+        returns (Rating memory)
+    {
         return ratings[ratee][topicId][rater][timestamp];
     }
 
@@ -342,12 +330,11 @@ contract PeerRating {
      * @param scoreTime Get rating as of this timestamp
      * @return Rating struct (most recent before scoreTime)
      */
-    function getRatingAtTime(
-        address ratee,
-        uint32 topicId,
-        address rater,
-        uint64 scoreTime
-    ) external view returns (Rating memory) {
+    function getRatingAtTime(address ratee, uint32 topicId, address rater, uint64 scoreTime)
+        external
+        view
+        returns (Rating memory)
+    {
         return _getMostRecentRatingBefore(ratee, topicId, rater, scoreTime);
     }
 
@@ -358,11 +345,11 @@ contract PeerRating {
      * @param rater User who gave the rating
      * @return Array of timestamps
      */
-    function getRatingTimestamps(
-        address ratee,
-        uint32 topicId,
-        address rater
-    ) external view returns (uint64[] memory) {
+    function getRatingTimestamps(address ratee, uint32 topicId, address rater)
+        external
+        view
+        returns (uint64[] memory)
+    {
         return ratingTimestamps[ratee][topicId][rater];
     }
 
@@ -372,10 +359,7 @@ contract PeerRating {
      * @param topicId Topic ID
      * @return UserTopicRatings struct
      */
-    function getUserTopicRating(
-        address user,
-        uint32 topicId
-    ) external view returns (UserTopicRatings memory) {
+    function getUserTopicRating(address user, uint32 topicId) external view returns (UserTopicRatings memory) {
         return userTopicRatings[user][topicId];
     }
 
@@ -386,11 +370,11 @@ contract PeerRating {
      * @param scoreTime Calculate ratings as of this timestamp
      * @return UserTopicRatings struct calculated at scoreTime
      */
-    function getUserTopicRatingAtTime(
-        address user,
-        uint32 topicId,
-        uint64 scoreTime
-    ) external view returns (UserTopicRatings memory) {
+    function getUserTopicRatingAtTime(address user, uint32 topicId, uint64 scoreTime)
+        external
+        view
+        returns (UserTopicRatings memory)
+    {
         address[] memory raters = topicRaters[user][topicId];
         uint256 totalScore = 0;
         uint256 validRatings = 0;
@@ -466,11 +450,7 @@ contract PeerRating {
      * @param rater User who gave the rating
      * @return true if any rating exists from this rater
      */
-    function ratingExists(
-        address ratee,
-        uint32 topicId,
-        address rater
-    ) external view returns (bool) {
+    function ratingExists(address ratee, uint32 topicId, address rater) external view returns (bool) {
         return ratingTimestamps[ratee][topicId][rater].length > 0;
     }
 
@@ -482,12 +462,21 @@ contract PeerRating {
      * @param timestamp Specific timestamp to check
      * @return true if rating exists at that timestamp
      */
-    function ratingExistsAtTimestamp(
-        address ratee,
-        uint32 topicId,
-        address rater,
-        uint64 timestamp
-    ) external view returns (bool) {
+    function ratingExistsAtTimestamp(address ratee, uint32 topicId, address rater, uint64 timestamp)
+        external
+        view
+        returns (bool)
+    {
         return ratings[ratee][topicId][rater][timestamp].exists;
     }
+
+    /*///////////////////////////
+      INTERNAL FUNCTIONS
+    ///////////////////////////*/
+
+    /**
+     * @notice Authorize contract upgrade
+     * @dev Only owner can upgrade the contract
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

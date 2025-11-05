@@ -2,13 +2,16 @@
 pragma solidity ^0.8.24;
 
 import "./TopicRegistry.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /**
  * @title User
  * @notice Manages user profiles and expertise scores across topics
  * @dev Uses efficient storage packing with uint16 for scores (0-1000 range)
  */
-contract User {
+contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /*///////////////////////////
            ERRORS
     ///////////////////////////*/
@@ -24,10 +27,10 @@ contract User {
 
     // Packed struct: 2 per storage slot (128 bits each)
     struct UserTopicExpertise {
-        uint16 score;              // 0-1000 expertise score
-        uint32 totalChallenges;    // Total challenges attempted
-        uint32 correctChallenges;  // Correct challenges
-        uint64 lastActivityTime;   // Last activity timestamp for time decay
+        uint16 score; // 0-1000 expertise score
+        uint32 totalChallenges; // Total challenges attempted
+        uint32 correctChallenges; // Correct challenges
+        uint64 lastActivityTime; // Last activity timestamp for time decay
     }
 
     struct UserProfile {
@@ -50,7 +53,7 @@ contract User {
     mapping(address => mapping(uint32 => UserTopicExpertise)) public userExpertise; // user => topicId => expertise
     mapping(address => uint32[]) public userTopics; // user => engaged topic IDs
 
-    TopicRegistry public immutable topicRegistry;
+    TopicRegistry public topicRegistry;
     address public reputationEngine; // Will be set after ReputationEngine deployment
     address public peerRatingContract; // Will be set after PeerRating deployment
 
@@ -80,7 +83,18 @@ contract User {
          CONSTRUCTOR
     ///////////////////////////*/
 
-    constructor(address _topicRegistry) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @notice Initialize the contract
+     * @param initialOwner The address that will own this contract
+     * @param _topicRegistry Address of the TopicRegistry contract
+     */
+    function initialize(address initialOwner, address _topicRegistry) external initializer {
+        __Ownable_init(initialOwner);
         topicRegistry = TopicRegistry(_topicRegistry);
     }
 
@@ -92,7 +106,7 @@ contract User {
      * @notice Set the reputation engine address (can only be done once)
      * @param _reputationEngine Address of the ReputationEngine contract
      */
-    function setReputationEngine(address _reputationEngine) external {
+    function setReputationEngine(address _reputationEngine) external onlyOwner {
         if (reputationEngine != address(0)) revert Unauthorized();
         reputationEngine = _reputationEngine;
     }
@@ -101,7 +115,7 @@ contract User {
      * @notice Set the peer rating contract address (can only be done once)
      * @param _peerRatingContract Address of the PeerRating contract
      */
-    function setPeerRatingContract(address _peerRatingContract) external {
+    function setPeerRatingContract(address _peerRatingContract) external onlyOwner {
         if (peerRatingContract != address(0)) revert Unauthorized();
         peerRatingContract = _peerRatingContract;
     }
@@ -128,11 +142,7 @@ contract User {
      * @param topicId Topic ID
      * @param correct Whether the answer was correct
      */
-    function recordChallengeAttempt(
-        address user,
-        uint32 topicId,
-        bool correct
-    ) external onlyReputationEngine {
+    function recordChallengeAttempt(address user, uint32 topicId, bool correct) external onlyReputationEngine {
         if (!userProfiles[user].isRegistered) revert UserNotRegistered();
 
         // Verify topic exists
@@ -163,11 +173,7 @@ contract User {
      * @param topicId Topic ID
      * @param newScore New expertise score
      */
-    function updateExpertiseScore(
-        address user,
-        uint32 topicId,
-        uint16 newScore
-    ) external onlyReputationEngine {
+    function updateExpertiseScore(address user, uint32 topicId, uint16 newScore) external onlyReputationEngine {
         if (newScore > MAX_SCORE) newScore = MAX_SCORE;
         if (newScore < MIN_SCORE) newScore = MIN_SCORE;
 
@@ -185,10 +191,7 @@ contract User {
      * @param topicId Topic ID
      * @return expertise UserTopicExpertise struct
      */
-    function getUserExpertise(
-        address user,
-        uint32 topicId
-    ) external view returns (UserTopicExpertise memory) {
+    function getUserExpertise(address user, uint32 topicId) external view returns (UserTopicExpertise memory) {
         return userExpertise[user][topicId];
     }
 
@@ -244,4 +247,14 @@ contract User {
     function isRegistered(address user) external view returns (bool) {
         return userProfiles[user].isRegistered;
     }
+
+    /*///////////////////////////
+      INTERNAL FUNCTIONS
+    ///////////////////////////*/
+
+    /**
+     * @notice Authorize contract upgrade
+     * @dev Only owner can upgrade the contract
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

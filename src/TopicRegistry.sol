@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+
 /**
  * @title TopicRegistry
  * @notice Manages hierarchical topic taxonomy for expertise tracking
  * @dev Topics can have parent-child relationships (e.g., Tech -> Software -> Backend -> Python)
  */
-contract TopicRegistry {
+contract TopicRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /*///////////////////////////
            ERRORS
     ///////////////////////////*/
 
-    error Unauthorized();
     error TopicNotFound();
     error TopicAlreadyExists();
     error InvalidParentTopic();
@@ -37,7 +40,6 @@ contract TopicRegistry {
     mapping(uint32 => uint32[]) public childTopics; // parentId => childIds[]
     mapping(string => uint32) public topicNameToId; // name => id (for lookups)
     uint32 public topicCount;
-    address public admin;
 
     /*///////////////////////////
            EVENTS
@@ -45,23 +47,22 @@ contract TopicRegistry {
 
     event TopicCreated(uint32 indexed topicId, string name, uint32 indexed parentId);
     event TopicUpdated(uint32 indexed topicId, string name, bool isActive);
-    event AdminTransferred(address indexed previousAdmin, address indexed newAdmin);
-
-    /*///////////////////////////
-         MODIFIERS
-    ///////////////////////////*/
-
-    modifier onlyAdmin() {
-        if (msg.sender != admin) revert Unauthorized();
-        _;
-    }
 
     /*///////////////////////////
          CONSTRUCTOR
     ///////////////////////////*/
 
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
-        admin = msg.sender;
+        _disableInitializers();
+    }
+
+    /**
+     * @notice Initialize the contract
+     * @param initialOwner The address that will own this contract
+     */
+    function initialize(address initialOwner) external initializer {
+        __Ownable_init(initialOwner);
         topicCount = 0;
     }
 
@@ -75,7 +76,7 @@ contract TopicRegistry {
      * @param parentId Parent topic ID (0 for root topics)
      * @return topicId The ID of the created topic
      */
-    function createTopic(string calldata name, uint32 parentId) external onlyAdmin returns (uint32) {
+    function createTopic(string calldata name, uint32 parentId) external onlyOwner returns (uint32) {
         if (bytes(name).length == 0) revert TopicNameEmpty();
         if (topicNameToId[name] != 0) revert TopicAlreadyExists();
         if (parentId != 0 && !topics[parentId].isActive) revert InvalidParentTopic();
@@ -83,13 +84,8 @@ contract TopicRegistry {
         topicCount++;
         uint32 newTopicId = topicCount;
 
-        topics[newTopicId] = Topic({
-            id: newTopicId,
-            name: name,
-            parentId: parentId,
-            isActive: true,
-            createdAt: uint64(block.timestamp)
-        });
+        topics[newTopicId] =
+            Topic({id: newTopicId, name: name, parentId: parentId, isActive: true, createdAt: uint64(block.timestamp)});
 
         topicNameToId[name] = newTopicId;
 
@@ -106,20 +102,10 @@ contract TopicRegistry {
      * @param topicId Topic ID to update
      * @param isActive New active status
      */
-    function setTopicActive(uint32 topicId, bool isActive) external onlyAdmin {
+    function setTopicActive(uint32 topicId, bool isActive) external onlyOwner {
         if (topics[topicId].id == 0) revert TopicNotFound();
         topics[topicId].isActive = isActive;
         emit TopicUpdated(topicId, topics[topicId].name, isActive);
-    }
-
-    /**
-     * @notice Transfer admin rights
-     * @param newAdmin New admin address
-     */
-    function transferAdmin(address newAdmin) external onlyAdmin {
-        address previousAdmin = admin;
-        admin = newAdmin;
-        emit AdminTransferred(previousAdmin, newAdmin);
     }
 
     /*///////////////////////////
@@ -187,4 +173,14 @@ contract TopicRegistry {
 
         return false;
     }
+
+    /*///////////////////////////
+      INTERNAL FUNCTIONS
+    ///////////////////////////*/
+
+    /**
+     * @notice Authorize contract upgrade
+     * @dev Only owner can upgrade the contract
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

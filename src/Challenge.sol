@@ -3,13 +3,16 @@ pragma solidity ^0.8.24;
 
 import "./TopicRegistry.sol";
 import "./User.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
 
 /**
  * @title Challenge
  * @notice Manages objective validation questions for expertise building
  * @dev Stores question hashes on-chain, full questions stored off-chain (IPFS/events)
  */
-contract Challenge {
+contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /*///////////////////////////
            ERRORS
     ///////////////////////////*/
@@ -27,10 +30,11 @@ contract Challenge {
     ///////////////////////////*/
 
     enum DifficultyLevel {
-        Easy,      // +5-10 score on correct
-        Medium,    // +10-20 score on correct
-        Hard,      // +20-40 score on correct
-        Expert     // +40-80 score on correct
+        Easy, // +5-10 score on correct
+        Medium, // +10-20 score on correct
+        Hard, // +20-40 score on correct
+        Expert // +40-80 score on correct
+
     }
 
     enum ChallengeStatus {
@@ -45,7 +49,7 @@ contract Challenge {
         uint32 topicId;
         DifficultyLevel difficulty;
         ChallengeStatus status;
-        bytes32 questionHash;      // Hash of question content (stored off-chain)
+        bytes32 questionHash; // Hash of question content (stored off-chain)
         bytes32 correctAnswerHash; // Hash of correct answer
         uint64 createdAt;
         uint32 totalAttempts;
@@ -70,8 +74,8 @@ contract Challenge {
     mapping(uint32 => uint64[]) public topicChallenges; // topicId => challengeIds[]
 
     uint64 public challengeCount;
-    TopicRegistry public immutable topicRegistry;
-    User public immutable userContract;
+    TopicRegistry public topicRegistry;
+    User public userContract;
     address public reputationEngine;
 
     /*///////////////////////////
@@ -79,17 +83,9 @@ contract Challenge {
     ///////////////////////////*/
 
     event ChallengeCreated(
-        uint64 indexed challengeId,
-        address indexed creator,
-        uint32 indexed topicId,
-        DifficultyLevel difficulty
+        uint64 indexed challengeId, address indexed creator, uint32 indexed topicId, DifficultyLevel difficulty
     );
-    event ChallengeAttempted(
-        uint64 indexed challengeId,
-        address indexed user,
-        bool isCorrect,
-        uint64 timestamp
-    );
+    event ChallengeAttempted(uint64 indexed challengeId, address indexed user, bool isCorrect, uint64 timestamp);
     event ChallengeStatusUpdated(uint64 indexed challengeId, ChallengeStatus newStatus);
 
     /*///////////////////////////
@@ -105,7 +101,19 @@ contract Challenge {
          CONSTRUCTOR
     ///////////////////////////*/
 
-    constructor(address _topicRegistry, address _userContract) {
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
+     * @notice Initialize the contract
+     * @param initialOwner The address that will own this contract
+     * @param _topicRegistry Address of the TopicRegistry contract
+     * @param _userContract Address of the User contract
+     */
+    function initialize(address initialOwner, address _topicRegistry, address _userContract) external initializer {
+        __Ownable_init(initialOwner);
         topicRegistry = TopicRegistry(_topicRegistry);
         userContract = User(_userContract);
         challengeCount = 0;
@@ -119,7 +127,7 @@ contract Challenge {
      * @notice Set reputation engine address (one-time)
      * @param _reputationEngine ReputationEngine contract address
      */
-    function setReputationEngine(address _reputationEngine) external {
+    function setReputationEngine(address _reputationEngine) external onlyOwner {
         if (reputationEngine != address(0)) revert Unauthorized();
         reputationEngine = _reputationEngine;
     }
@@ -212,7 +220,7 @@ contract Challenge {
     function updateChallengeStatus(uint64 challengeId, ChallengeStatus newStatus) external {
         ChallengeData storage challenge = challenges[challengeId];
         if (challenge.id == 0) revert ChallengeNotFound();
-        if (msg.sender != challenge.creator && msg.sender != topicRegistry.admin()) {
+        if (msg.sender != challenge.creator && msg.sender != topicRegistry.owner()) {
             revert Unauthorized();
         }
 
@@ -240,10 +248,7 @@ contract Challenge {
      * @param challengeId Challenge ID
      * @return ChallengeAttempt struct (attemptedAt = 0 if not attempted)
      */
-    function getUserAttempt(
-        address user,
-        uint64 challengeId
-    ) external view returns (ChallengeAttempt memory) {
+    function getUserAttempt(address user, uint64 challengeId) external view returns (ChallengeAttempt memory) {
         return userAttempts[user][challengeId];
     }
 
@@ -290,4 +295,14 @@ contract Challenge {
         if (difficulty == DifficultyLevel.Hard) return 25;
         return 40; // Expert
     }
+
+    /*///////////////////////////
+      INTERNAL FUNCTIONS
+    ///////////////////////////*/
+
+    /**
+     * @notice Authorize contract upgrade
+     * @dev Only owner can upgrade the contract
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }
