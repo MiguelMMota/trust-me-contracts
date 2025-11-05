@@ -1,128 +1,128 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Script.sol";
-import "../src/TopicRegistry.sol";
-import "../src/User.sol";
-import "../src/Challenge.sol";
-import "../src/ReputationEngine.sol";
-import "../src/Poll.sol";
-import "../src/PeerRating.sol";
+import {Script} from "forge-std/Script.sol";
+import {console} from "forge-std/console.sol";
+import {TopicRegistry} from "../src/TopicRegistry.sol";
+import {User} from "../src/User.sol";
+import {Challenge} from "../src/Challenge.sol";
+import {PeerRating} from "../src/PeerRating.sol";
+import {ReputationEngine} from "../src/ReputationEngine.sol";
+import {Poll} from "../src/Poll.sol";
+import {DeploymentConfig} from "./config/DeploymentConfig.sol";
+import {DeployTopicRegistry} from "./deploy/DeployTopicRegistry.s.sol";
+import {DeployUser} from "./deploy/DeployUser.s.sol";
+import {DeployChallenge} from "./deploy/DeployChallenge.s.sol";
+import {DeployPeerRating} from "./deploy/DeployPeerRating.s.sol";
+import {DeployReputationEngine} from "./deploy/DeployReputationEngine.s.sol";
+import {DeployPoll} from "./deploy/DeployPoll.s.sol";
 
-contract DeployScript is Script {
+/**
+ * @title DeployScript
+ * @notice Orchestrates full deployment of all contracts using modular scripts
+ * @dev Uses UUPS proxy pattern for upgradeable contracts
+ */
+contract DeployScript is Script, DeploymentConfig {
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(deployerPrivateKey);
 
-        console.log("Deploying contracts with address:", deployer);
-        console.log("Account balance:", deployer.balance);
+        console.log("\n===============================================");
+        console.log("   TrustMe Full Deployment with Proxies");
+        console.log("===============================================");
+        console.log("Deployer:", deployer);
+        console.log("Network:", getNetworkName());
+        console.log("Balance:", deployer.balance);
+        console.log("===============================================\n");
 
-        vm.startBroadcast(deployerPrivateKey);
+        // Deploy all contracts using individual scripts
+        DeployTopicRegistry topicRegistryDeployer = new DeployTopicRegistry();
+        address topicRegistry = topicRegistryDeployer.run();
 
-        // Deploy contracts in correct order
-        TopicRegistry topicRegistry = new TopicRegistry();
-        console.log("TopicRegistry deployed at:", address(topicRegistry));
+        DeployUser userDeployer = new DeployUser();
+        address userContract = userDeployer.run();
 
-        User userContract = new User(address(topicRegistry));
-        console.log("User deployed at:", address(userContract));
+        DeployChallenge challengeDeployer = new DeployChallenge();
+        address challengeContract = challengeDeployer.run();
 
-        Challenge challengeContract = new Challenge(address(topicRegistry), address(userContract));
-        console.log("Challenge deployed at:", address(challengeContract));
+        DeployPeerRating peerRatingDeployer = new DeployPeerRating();
+        address peerRatingContract = peerRatingDeployer.run();
 
-        PeerRating peerRatingContract = new PeerRating(address(topicRegistry), address(userContract));
-        console.log("PeerRating deployed at:", address(peerRatingContract));
+        DeployReputationEngine reputationEngineDeployer = new DeployReputationEngine();
+        address reputationEngine = reputationEngineDeployer.run();
 
-        ReputationEngine reputationEngine = new ReputationEngine(
-            address(userContract),
-            address(challengeContract),
-            address(topicRegistry)
-        );
-        console.log("ReputationEngine deployed at:", address(reputationEngine));
-
-        Poll pollContract = new Poll(
-            address(userContract),
-            address(reputationEngine),
-            address(topicRegistry)
-        );
-        console.log("Poll deployed at:", address(pollContract));
+        DeployPoll pollDeployer = new DeployPoll();
+        address pollContract = pollDeployer.run();
 
         // Set cross-contract references
-        userContract.setReputationEngine(address(reputationEngine));
-        userContract.setPeerRatingContract(address(peerRatingContract));
-        challengeContract.setReputationEngine(address(reputationEngine));
-        peerRatingContract.setReputationEngine(address(reputationEngine));
-        reputationEngine.setPeerRatingContract(address(peerRatingContract));
-        console.log("Contract references set");
+        console.log("\n=== Setting Cross-Contract References ===");
+        vm.startBroadcast(deployerPrivateKey);
 
-        // Create initial topics
-        uint32 mathId = topicRegistry.createTopic("Mathematics", 0);
-        console.log("Created topic: Mathematics (ID:", mathId, ")");
+        User(userContract).setReputationEngine(reputationEngine);
+        console.log("User.setReputationEngine()");
 
-        uint32 algebraId = topicRegistry.createTopic("Algebra", mathId);
-        console.log("Created topic: Algebra (ID:", algebraId, ")");
+        User(userContract).setPeerRatingContract(peerRatingContract);
+        console.log("User.setPeerRatingContract()");
 
-        uint32 calculusId = topicRegistry.createTopic("Calculus", mathId);
-        console.log("Created topic: Calculus (ID:", calculusId, ")");
+        Challenge(challengeContract).setReputationEngine(reputationEngine);
+        console.log("Challenge.setReputationEngine()");
 
-        uint32 historyId = topicRegistry.createTopic("History", 0);
-        console.log("Created topic: History (ID:", historyId, ")");
+        PeerRating(peerRatingContract).setReputationEngine(reputationEngine);
+        console.log("PeerRating.setReputationEngine()");
 
-        uint32 worldHistoryId = topicRegistry.createTopic("World History", historyId);
-        console.log("Created topic: World History (ID:", worldHistoryId, ")");
+        ReputationEngine(reputationEngine).setPeerRatingContract(peerRatingContract);
+        console.log("ReputationEngine.setPeerRatingContract()");
 
-        uint32 languagesId = topicRegistry.createTopic("Languages", 0);
-        console.log("Created topic: Languages (ID:", languagesId, ")");
+        console.log("=== Cross-Contract References Complete ===\n");
 
-        uint32 englishId = topicRegistry.createTopic("English", languagesId);
-        console.log("Created topic: English (ID:", englishId, ")");
+        // Create initial topic hierarchy
+        console.log("=== Creating Initial Topic Hierarchy ===");
 
-        uint32 spanishId = topicRegistry.createTopic("Spanish", languagesId);
-        console.log("Created topic: Spanish (ID:", spanishId, ")");
+        uint32 mathId = TopicRegistry(topicRegistry).createTopic("Mathematics", 0);
+        uint32 algebraId = TopicRegistry(topicRegistry).createTopic("Algebra", mathId);
+        uint32 calculusId = TopicRegistry(topicRegistry).createTopic("Calculus", mathId);
 
-        uint32 softwareId = topicRegistry.createTopic("Software Engineering", 0);
-        console.log("Created topic: Software Engineering (ID:", softwareId, ")");
+        uint32 historyId = TopicRegistry(topicRegistry).createTopic("History", 0);
+        uint32 worldHistoryId = TopicRegistry(topicRegistry).createTopic("World History", historyId);
 
-        uint32 frontendId = topicRegistry.createTopic("Frontend Development", softwareId);
-        console.log("Created topic: Frontend Development (ID:", frontendId, ")");
+        uint32 languagesId = TopicRegistry(topicRegistry).createTopic("Languages", 0);
+        uint32 englishId = TopicRegistry(topicRegistry).createTopic("English", languagesId);
+        uint32 spanishId = TopicRegistry(topicRegistry).createTopic("Spanish", languagesId);
 
-        uint32 backendId = topicRegistry.createTopic("Backend Development", softwareId);
-        console.log("Created topic: Backend Development (ID:", backendId, ")");
+        uint32 softwareId = TopicRegistry(topicRegistry).createTopic("Software Engineering", 0);
+        uint32 frontendId = TopicRegistry(topicRegistry).createTopic("Frontend Development", softwareId);
+        uint32 backendId = TopicRegistry(topicRegistry).createTopic("Backend Development", softwareId);
+        uint32 pythonId = TopicRegistry(topicRegistry).createTopic("Python", backendId);
+        uint32 blockchainId = TopicRegistry(topicRegistry).createTopic("Blockchain Development", softwareId);
 
-        uint32 pythonId = topicRegistry.createTopic("Python", backendId);
-        console.log("Created topic: Python (ID:", pythonId, ")");
-
-        uint32 blockchainId = topicRegistry.createTopic("Blockchain Development", softwareId);
-        console.log("Created topic: Blockchain Development (ID:", blockchainId, ")");
+        console.log("Created 13 topics across 4 root categories");
 
         vm.stopBroadcast();
 
-        // Save deployment addresses to a file
-        string memory deploymentInfo = string.concat(
-            "# TrustMe Contract Deployments\n\n",
-            "## Network: ", vm.toString(block.chainid), "\n\n",
-            "- **TopicRegistry**: ", vm.toString(address(topicRegistry)), "\n",
-            "- **User**: ", vm.toString(address(userContract)), "\n",
-            "- **Challenge**: ", vm.toString(address(challengeContract)), "\n",
-            "- **PeerRating**: ", vm.toString(address(peerRatingContract)), "\n",
-            "- **ReputationEngine**: ", vm.toString(address(reputationEngine)), "\n",
-            "- **Poll**: ", vm.toString(address(pollContract)), "\n\n",
-            "## Topics Created:\n",
-            "- Mathematics (", vm.toString(mathId), ")\n",
-            "  - Algebra (", vm.toString(algebraId), ")\n",
-            "  - Calculus (", vm.toString(calculusId), ")\n",
-            "- History (", vm.toString(historyId), ")\n",
-            "  - World History (", vm.toString(worldHistoryId), ")\n",
-            "- Languages (", vm.toString(languagesId), ")\n",
-            "  - English (", vm.toString(englishId), ")\n",
-            "  - Spanish (", vm.toString(spanishId), ")\n",
-            "- Software Engineering (", vm.toString(softwareId), ")\n",
-            "  - Frontend Development (", vm.toString(frontendId), ")\n",
-            "  - Backend Development (", vm.toString(backendId), ")\n",
-            "    - Python (", vm.toString(pythonId), ")\n",
-            "  - Blockchain Development (", vm.toString(blockchainId), ")\n"
-        );
+        console.log("=== Topic Hierarchy Complete ===\n");
 
-        vm.writeFile("deployments.md", deploymentInfo);
-        console.log("\nDeployment info saved to deployments.md");
+        // Print deployment summary
+        console.log("\n===============================================");
+        console.log("         Deployment Summary");
+        console.log("===============================================");
+        printDeploymentStatus();
+        console.log("Topics Created:");
+        console.log("  - Mathematics (", mathId, ")");
+        console.log("    - Algebra (", algebraId, ")");
+        console.log("    - Calculus (", calculusId, ")");
+        console.log("  - History (", historyId, ")");
+        console.log("    - World History (", worldHistoryId, ")");
+        console.log("  - Languages (", languagesId, ")");
+        console.log("    - English (", englishId, ")");
+        console.log("    - Spanish (", spanishId, ")");
+        console.log("  - Software Engineering (", softwareId, ")");
+        console.log("    - Frontend Development (", frontendId, ")");
+        console.log("    - Backend Development (", backendId, ")");
+        console.log("      - Python (", pythonId, ")");
+        console.log("    - Blockchain Development (", blockchainId, ")");
+        console.log("===============================================");
+        console.log("\nDeployment complete! Config saved to:");
+        console.log(getDeploymentPath());
+        console.log("===============================================\n");
     }
 }
