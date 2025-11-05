@@ -1,0 +1,119 @@
+name: Deploy Changed Contracts
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    paths:
+      - 'src/*.sol'
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  detect-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # Need previous commit to compare
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: nightly
+
+      - name: Install dependencies
+        run: forge install
+
+      - name: Detect changed contracts
+        id: changes
+        run: |
+          echo "Detecting changed contracts..."
+
+          # Get changed files in src/ directory
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD -- 'src/*.sol' | grep -v 'src/interfaces/' || true)
+
+          if [ -z "$CHANGED_FILES" ]; then
+            echo "No contract changes detected"
+            echo "contracts=" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          echo "Changed files:"
+          echo "$CHANGED_FILES"
+
+          # Extract contract names (without .sol extension)
+          CONTRACTS=""
+          for file in $CHANGED_FILES; do
+            contract=$(basename "$file" .sol)
+            CONTRACTS="$CONTRACTS $contract"
+          done
+
+          # Trim and convert to JSON array
+          CONTRACTS=$(echo $CONTRACTS | xargs)
+          CONTRACTS_JSON=$(echo $CONTRACTS | tr ' ' '\n' | jq -R . | jq -s .)
+
+          echo "Contracts to upgrade: $CONTRACTS"
+          echo "contracts=$CONTRACTS_JSON" >> $GITHUB_OUTPUT
+
+      - name: Run build and tests
+        if: steps.changes.outputs.contracts != ''
+        run: |
+          forge build
+          forge test
+
+      - name: Deploy changed contracts
+        if: steps.changes.outputs.contracts != ''
+        env:
+          PRIVATE_KEY: ${{ secrets.DEPLOYER_PRIVATE_KEY }}
+          SEPOLIA_RPC_URL: ${{ secrets.SEPOLIA_RPC_URL }}
+          ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        run: |
+          CONTRACTS='${{ steps.changes.outputs.contracts }}'
+
+          echo "Deploying contracts: $CONTRACTS"
+
+          # Parse JSON array and upgrade each contract
+          echo "$CONTRACTS" | jq -r '.[]' | while read contract; do
+            echo "========================================"
+            echo "Upgrading $contract..."
+            echo "========================================"
+
+            SCRIPT_PATH="script/upgrade/Upgrade${contract}.s.sol"
+
+            if [ -f "$SCRIPT_PATH" ]; then
+              forge script "$SCRIPT_PATH" \
+                --rpc-url sepolia \
+                --broadcast \
+                --verify \
+                -vvv
+
+              if [ $? -eq 0 ]; then
+                echo "✅ Successfully upgraded $contract"
+              else
+                echo "❌ Failed to upgrade $contract"
+                exit 1
+              fi
+            else
+              echo "⚠️  Upgrade script not found: $SCRIPT_PATH"
+              echo "Skipping $contract"
+            fi
+          done
+
+      - name: Commit updated deployment config
+        if: steps.changes.outputs.contracts != ''
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          if [ -n "$(git status --porcelain deployments/)" ]; then
+            git add deployments/
+            git commit -m "Update deployment config after automated upgrade"
+            git push
+          else
+            echo "No deployment config changes to commit"
+          fi
