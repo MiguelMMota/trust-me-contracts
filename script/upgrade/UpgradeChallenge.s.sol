@@ -8,7 +8,7 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
 
 contract UpgradeChallenge is Script, DeploymentConfig {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         console.log("\n=== Upgrading Challenge ===");
         console.log("Network:", getNetworkName());
 
@@ -16,7 +16,7 @@ contract UpgradeChallenge is Script, DeploymentConfig {
         address proxy = getContractAddress("Challenge");
         console.log("Proxy address:", proxy);
 
-        vm.startBroadcast(deployerPrivateKey);
+        startBroadcast();
         Challenge newImplementation = new Challenge();
         console.log("New implementation:", address(newImplementation));
         Challenge(proxy).upgradeToAndCall(address(newImplementation), "");

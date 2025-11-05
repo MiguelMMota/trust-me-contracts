@@ -14,8 +14,7 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
  */
 contract DeployChallenge is Script, DeploymentConfig {
     function run() external returns (address proxy) {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        address deployer = getDeployer();
 
         console.log("\n=== Deploying Challenge ===");
         console.log("Deployer:", deployer);
@@ -34,7 +33,7 @@ contract DeployChallenge is Script, DeploymentConfig {
         console.log("Using TopicRegistry at:", topicRegistry);
         console.log("Using User at:", user);
 
-        vm.startBroadcast(deployerPrivateKey);
+        startBroadcast();
 
         // 1. Deploy implementation
         Challenge implementation = new Challenge();

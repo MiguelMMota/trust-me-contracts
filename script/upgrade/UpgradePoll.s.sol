@@ -8,7 +8,7 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
 
 contract UpgradePoll is Script, DeploymentConfig {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         console.log("\n=== Upgrading Poll ===");
         console.log("Network:", getNetworkName());
 
@@ -16,7 +16,7 @@ contract UpgradePoll is Script, DeploymentConfig {
         address proxy = getContractAddress("Poll");
         console.log("Proxy address:", proxy);
 
-        vm.startBroadcast(deployerPrivateKey);
+        startBroadcast();
         Poll newImplementation = new Poll();
         console.log("New implementation:", address(newImplementation));
         Poll(proxy).upgradeToAndCall(address(newImplementation), "");

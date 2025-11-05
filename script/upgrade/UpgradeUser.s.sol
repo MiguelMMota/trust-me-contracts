@@ -12,8 +12,7 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
  */
 contract UpgradeUser is Script, DeploymentConfig {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        address deployer = getDeployer();
 
         console.log("\n=== Upgrading User ===");
         console.log("Upgrader:", deployer);
@@ -25,7 +24,7 @@ contract UpgradeUser is Script, DeploymentConfig {
         address proxy = getContractAddress("User");
         console.log("Proxy address:", proxy);
 
-        vm.startBroadcast(deployerPrivateKey);
+        startBroadcast();
 
         User newImplementation = new User();
         console.log("New implementation deployed at:", address(newImplementation));

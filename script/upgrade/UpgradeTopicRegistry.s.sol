@@ -13,8 +13,8 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
  */
 contract UpgradeTopicRegistry is Script, DeploymentConfig {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address deployer = getDeployer();
 
         console.log("\n=== Upgrading TopicRegistry ===");
         console.log("Upgrader:", deployer);
@@ -27,7 +27,7 @@ contract UpgradeTopicRegistry is Script, DeploymentConfig {
         address proxy = getContractAddress("TopicRegistry");
         console.log("Proxy address:", proxy);
 
-        vm.startBroadcast(deployerPrivateKey);
+        startBroadcast();
 
         // 1. Deploy new implementation
         TopicRegistry newImplementation = new TopicRegistry();

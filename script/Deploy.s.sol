@@ -24,8 +24,7 @@ import {DeployPoll} from "./deploy/DeployPoll.s.sol";
  */
 contract DeployScript is Script, DeploymentConfig {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        address deployer = getDeployer();
 
         console.log("\n===============================================");
         console.log("   TrustMe Full Deployment with Proxies");
@@ -56,7 +55,7 @@ contract DeployScript is Script, DeploymentConfig {
 
         // Set cross-contract references
         console.log("\n=== Setting Cross-Contract References ===");
-        vm.startBroadcast(deployerPrivateKey);
+        startBroadcast();
 
         User(userContract).setReputationEngine(reputationEngine);
         console.log("User.setReputationEngine()");

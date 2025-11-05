@@ -8,7 +8,7 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
 
 contract UpgradeReputationEngine is Script, DeploymentConfig {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
+        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         console.log("\n=== Upgrading ReputationEngine ===");
         console.log("Network:", getNetworkName());
 
@@ -16,7 +16,7 @@ contract UpgradeReputationEngine is Script, DeploymentConfig {
         address proxy = getContractAddress("ReputationEngine");
         console.log("Proxy address:", proxy);
 
-        vm.startBroadcast(deployerPrivateKey);
+        startBroadcast();
         ReputationEngine newImplementation = new ReputationEngine();
         console.log("New implementation:", address(newImplementation));
         ReputationEngine(proxy).upgradeToAndCall(address(newImplementation), "");

@@ -13,14 +13,14 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
  */
 contract DeployTopicRegistry is Script, DeploymentConfig {
     function run() external returns (address proxy) {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address deployer = getDeployer();
 
         console.log("\n=== Deploying TopicRegistry ===");
         console.log("Deployer:", deployer);
         console.log("Network:", getNetworkName());
 
-        vm.startBroadcast(deployerPrivateKey);
+        startBroadcast();
 
         // 1. Deploy implementation
         TopicRegistry implementation = new TopicRegistry();

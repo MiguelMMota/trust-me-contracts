@@ -14,8 +14,8 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
  */
 contract DeployPoll is Script, DeploymentConfig {
     function run() external returns (address proxy) {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
+        address deployer = getDeployer();
 
         console.log("\n=== Deploying Poll ===");
         console.log("Deployer:", deployer);
@@ -39,7 +39,7 @@ contract DeployPoll is Script, DeploymentConfig {
         console.log("Using ReputationEngine at:", reputationEngine);
         console.log("Using TopicRegistry at:", topicRegistry);
 
-        vm.startBroadcast(deployerPrivateKey);
+        startBroadcast();
 
         // 1. Deploy implementation
         Poll implementation = new Poll();

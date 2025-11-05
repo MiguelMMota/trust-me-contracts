@@ -14,8 +14,7 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
  */
 contract DeployUser is Script, DeploymentConfig {
     function run() external returns (address proxy) {
-        uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
-        address deployer = vm.addr(deployerPrivateKey);
+        address deployer = getDeployer();
 
         console.log("\n=== Deploying User ===");
         console.log("Deployer:", deployer);
@@ -28,7 +27,7 @@ contract DeployUser is Script, DeploymentConfig {
         address topicRegistry = getContractAddress("TopicRegistry");
         console.log("Using TopicRegistry at:", topicRegistry);
 
-        vm.startBroadcast(deployerPrivateKey);
+        startBroadcast();
 
         // 1. Deploy implementation
         User implementation = new User();
