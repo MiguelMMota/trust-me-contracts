@@ -1,0 +1,53 @@
+repos:
+  # Forge formatting check
+  - repo: local
+    hooks:
+      - id: forge-fmt-check
+        name: Forge Format Check
+        entry: forge fmt --check
+        language: system
+        files: \.sol$
+        pass_filenames: false
+
+  # Forge build (ensures contracts compile)
+  - repo: local
+    hooks:
+      - id: forge-build
+        name: Forge Build
+        entry: forge build
+        language: system
+        files: \.sol$
+        pass_filenames: false
+
+  # Slither static analysis
+  - repo: local
+    hooks:
+      - id: slither
+        name: Slither Static Analysis
+        entry: >-
+          bash -c 'if command -v slither &> /dev/null; then slither . --exclude-dependencies --exclude-informational --exclude-low --filter-paths "test/"; else echo "⚠️  Slither not installed. Install with pip install slither-analyzer"; fi'
+        language: system
+        files: ^src/.*\.sol$
+        pass_filenames: false
+
+  # Forge tests
+  - repo: local
+    hooks:
+      - id: forge-test
+        name: Forge Test
+        entry: forge test
+        language: system
+        files: \.(sol|t\.sol)$
+        pass_filenames: false
+
+  # # Forge coverage
+  # - repo: local
+  #   hooks:
+  #     - id: forge-coverage
+  #       name: Forge Coverage Check
+  #       entry: >-
+  #         bash -c 'coverage_output=$(forge coverage --report summary --ir-minimum 2>&1); src_coverage=$(echo "$coverage_output" | grep "src/" | awk -F"|" "{print \$3}" | awk -F"[()]" "NF>=2 {print \$2}" | awk -F"/" "{covered += \$1; total += \$2} END {if (total > 0) printf \"%.2f\", (covered / total) * 100; else print \"0\"}"); min_coverage=50; if [ -z "$src_coverage" ] || [ "$src_coverage" = "0" ]; then echo "❌ Could not parse src/ coverage"; echo "$coverage_output"; exit 1; fi; echo "src/ Coverage: ${src_coverage}%"; if (( $(echo "$src_coverage < $min_coverage" | bc -l) )); then echo "❌ src/ coverage ${src_coverage}% is below minimum ${min_coverage}%"; exit 1; fi; echo "✅ Coverage check passed (src/ files: ${src_coverage}%)"'
+  #       language: system
+  #       files: \.(sol|t\.sol)$
+  #       pass_filenames: false
+  #       verbose: true
