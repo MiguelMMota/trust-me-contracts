@@ -16,3 +16,6 @@ docs/
 # Deployment outputs
 deployments.md
 broadcast/
+
+# password file for cast wallet
+.password
