@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/TopicRegistry.sol";
 import "../src/User.sol";
 import "../src/ReputationEngine.sol";
@@ -23,23 +24,33 @@ contract PollTest is Test {
     function setUp() public {
         vm.startPrank(admin);
 
-        topicRegistry = new TopicRegistry();
-        userContract = new User(address(topicRegistry));
+        // Deploy TopicRegistry with proxy
+        TopicRegistry topicImpl = new TopicRegistry();
+        bytes memory topicInitData = abi.encodeWithSelector(TopicRegistry.initialize.selector, admin);
+        ERC1967Proxy topicProxy = new ERC1967Proxy(address(topicImpl), topicInitData);
+        topicRegistry = TopicRegistry(address(topicProxy));
 
-        // Note: ReputationEngine needs Challenge contract, but for Poll unit tests
-        // we can use a minimal setup or mock if needed
-        // For now, we'll create a minimal setup
-        reputationEngine = new ReputationEngine(
-            address(userContract),
-            address(0), // Challenge not needed for basic poll tests
-            address(topicRegistry)
-        );
+        // Deploy User with proxy
+        User userImpl = new User();
+        bytes memory userInitData = abi.encodeWithSelector(User.initialize.selector, admin, address(topicRegistry));
+        ERC1967Proxy userProxy = new ERC1967Proxy(address(userImpl), userInitData);
+        userContract = User(address(userProxy));
 
-        pollContract = new Poll(
-            address(userContract),
-            address(reputationEngine),
-            address(topicRegistry)
+        // Deploy ReputationEngine with proxy (Challenge not needed for basic poll tests)
+        ReputationEngine repImpl = new ReputationEngine();
+        bytes memory repInitData = abi.encodeWithSelector(
+            ReputationEngine.initialize.selector, admin, address(userContract), address(0), address(topicRegistry)
         );
+        ERC1967Proxy repProxy = new ERC1967Proxy(address(repImpl), repInitData);
+        reputationEngine = ReputationEngine(address(repProxy));
+
+        // Deploy Poll with proxy
+        Poll pollImpl = new Poll();
+        bytes memory pollInitData = abi.encodeWithSelector(
+            Poll.initialize.selector, admin, address(userContract), address(reputationEngine), address(topicRegistry)
+        );
+        ERC1967Proxy pollProxy = new ERC1967Proxy(address(pollImpl), pollInitData);
+        pollContract = Poll(address(pollProxy));
 
         userContract.setReputationEngine(address(reputationEngine));
 

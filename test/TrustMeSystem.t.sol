@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/TopicRegistry.sol";
 import "../src/User.sol";
 import "../src/Challenge.sol";
@@ -28,20 +29,44 @@ contract TrustMeSystemTest is Test {
     function setUp() public {
         vm.startPrank(admin);
 
-        // Deploy contracts in correct order
-        topicRegistry = new TopicRegistry();
-        userContract = new User(address(topicRegistry));
-        challengeContract = new Challenge(address(topicRegistry), address(userContract));
-        reputationEngine = new ReputationEngine(
+        // Deploy TopicRegistry with proxy
+        TopicRegistry topicImpl = new TopicRegistry();
+        bytes memory topicInitData = abi.encodeWithSelector(TopicRegistry.initialize.selector, admin);
+        ERC1967Proxy topicProxy = new ERC1967Proxy(address(topicImpl), topicInitData);
+        topicRegistry = TopicRegistry(address(topicProxy));
+
+        // Deploy User with proxy
+        User userImpl = new User();
+        bytes memory userInitData = abi.encodeWithSelector(User.initialize.selector, admin, address(topicRegistry));
+        ERC1967Proxy userProxy = new ERC1967Proxy(address(userImpl), userInitData);
+        userContract = User(address(userProxy));
+
+        // Deploy Challenge with proxy
+        Challenge challengeImpl = new Challenge();
+        bytes memory challengeInitData =
+            abi.encodeWithSelector(Challenge.initialize.selector, admin, address(topicRegistry), address(userContract));
+        ERC1967Proxy challengeProxy = new ERC1967Proxy(address(challengeImpl), challengeInitData);
+        challengeContract = Challenge(address(challengeProxy));
+
+        // Deploy ReputationEngine with proxy
+        ReputationEngine repImpl = new ReputationEngine();
+        bytes memory repInitData = abi.encodeWithSelector(
+            ReputationEngine.initialize.selector,
+            admin,
             address(userContract),
             address(challengeContract),
             address(topicRegistry)
         );
-        pollContract = new Poll(
-            address(userContract),
-            address(reputationEngine),
-            address(topicRegistry)
+        ERC1967Proxy repProxy = new ERC1967Proxy(address(repImpl), repInitData);
+        reputationEngine = ReputationEngine(address(repProxy));
+
+        // Deploy Poll with proxy
+        Poll pollImpl = new Poll();
+        bytes memory pollInitData = abi.encodeWithSelector(
+            Poll.initialize.selector, admin, address(userContract), address(reputationEngine), address(topicRegistry)
         );
+        ERC1967Proxy pollProxy = new ERC1967Proxy(address(pollImpl), pollInitData);
+        pollContract = Poll(address(pollProxy));
 
         // Set reputation engine in User and Challenge contracts
         userContract.setReputationEngine(address(reputationEngine));
@@ -54,7 +79,6 @@ contract TrustMeSystemTest is Test {
 
         vm.stopPrank();
     }
-
 
     function testMultipleChallengesScoring() public {
         // Setup
@@ -69,7 +93,7 @@ contract TrustMeSystemTest is Test {
         uint64[] memory challengeIds = new uint64[](5);
         bytes32[] memory answerHashes = new bytes32[](5);
 
-        for (uint i = 0; i < 5; i++) {
+        for (uint256 i = 0; i < 5; i++) {
             answerHashes[i] = keccak256(abi.encodePacked(i));
 
             vm.prank(admin);
@@ -82,7 +106,7 @@ contract TrustMeSystemTest is Test {
         }
 
         // Alice answers 4 correctly, 1 incorrectly
-        for (uint i = 0; i < 5; i++) {
+        for (uint256 i = 0; i < 5; i++) {
             vm.prank(alice);
             if (i == 2) {
                 // Wrong answer for 3rd challenge
@@ -104,7 +128,6 @@ contract TrustMeSystemTest is Test {
         console.log("Score with 80% accuracy (4/5 correct):", score);
     }
 
-
     function testWeightedVoting() public {
         // Setup: Register users
         vm.prank(alice);
@@ -117,14 +140,11 @@ contract TrustMeSystemTest is Test {
         userContract.registerUser();
 
         // Give Alice high expertise in math (answer 10 challenges correctly)
-        for (uint i = 0; i < 10; i++) {
+        for (uint256 i = 0; i < 10; i++) {
             bytes32 answerHash = keccak256(abi.encodePacked(i));
             vm.prank(admin);
             uint64 challengeId = challengeContract.createChallenge(
-                mathTopicId,
-                Challenge.DifficultyLevel.Medium,
-                keccak256(abi.encodePacked("Q", i)),
-                answerHash
+                mathTopicId, Challenge.DifficultyLevel.Medium, keccak256(abi.encodePacked("Q", i)), answerHash
             );
 
             vm.prank(alice);
@@ -162,7 +182,6 @@ contract TrustMeSystemTest is Test {
         assertEq(results.winningOption, 0); // Alice's choice wins due to higher expertise
     }
 
-
     function testAccuracyCalculation() public {
         vm.prank(alice);
         userContract.registerUser();
@@ -171,14 +190,11 @@ contract TrustMeSystemTest is Test {
         userContract.registerUser();
 
         // Answer 7 out of 10 correctly
-        for (uint i = 0; i < 10; i++) {
+        for (uint256 i = 0; i < 10; i++) {
             bytes32 answerHash = keccak256(abi.encodePacked(i));
             vm.prank(admin);
             uint64 challengeId = challengeContract.createChallenge(
-                mathTopicId,
-                Challenge.DifficultyLevel.Easy,
-                keccak256(abi.encodePacked("Q", i)),
-                answerHash
+                mathTopicId, Challenge.DifficultyLevel.Easy, keccak256(abi.encodePacked("Q", i)), answerHash
             );
 
             vm.prank(alice);

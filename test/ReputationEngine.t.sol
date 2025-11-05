@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/TopicRegistry.sol";
 import "../src/User.sol";
 import "../src/Challenge.sol";
@@ -22,14 +23,36 @@ contract ReputationEngineTest is Test {
     function setUp() public {
         vm.startPrank(admin);
 
-        topicRegistry = new TopicRegistry();
-        userContract = new User(address(topicRegistry));
-        challengeContract = new Challenge(address(topicRegistry), address(userContract));
-        reputationEngine = new ReputationEngine(
+        // Deploy TopicRegistry with proxy
+        TopicRegistry topicImpl = new TopicRegistry();
+        bytes memory topicInitData = abi.encodeWithSelector(TopicRegistry.initialize.selector, admin);
+        ERC1967Proxy topicProxy = new ERC1967Proxy(address(topicImpl), topicInitData);
+        topicRegistry = TopicRegistry(address(topicProxy));
+
+        // Deploy User with proxy
+        User userImpl = new User();
+        bytes memory userInitData = abi.encodeWithSelector(User.initialize.selector, admin, address(topicRegistry));
+        ERC1967Proxy userProxy = new ERC1967Proxy(address(userImpl), userInitData);
+        userContract = User(address(userProxy));
+
+        // Deploy Challenge with proxy
+        Challenge challengeImpl = new Challenge();
+        bytes memory challengeInitData =
+            abi.encodeWithSelector(Challenge.initialize.selector, admin, address(topicRegistry), address(userContract));
+        ERC1967Proxy challengeProxy = new ERC1967Proxy(address(challengeImpl), challengeInitData);
+        challengeContract = Challenge(address(challengeProxy));
+
+        // Deploy ReputationEngine with proxy
+        ReputationEngine repImpl = new ReputationEngine();
+        bytes memory repInitData = abi.encodeWithSelector(
+            ReputationEngine.initialize.selector,
+            admin,
             address(userContract),
             address(challengeContract),
             address(topicRegistry)
         );
+        ERC1967Proxy repProxy = new ERC1967Proxy(address(repImpl), repInitData);
+        reputationEngine = ReputationEngine(address(repProxy));
 
         // Set reputation engine in User and Challenge contracts
         userContract.setReputationEngine(address(reputationEngine));
@@ -64,10 +87,7 @@ contract ReputationEngineTest is Test {
         userContract.registerUser();
         vm.prank(admin);
         uint64 challengeId = challengeContract.createChallenge(
-            mathTopicId,
-            Challenge.DifficultyLevel.Easy,
-            keccak256("Question"),
-            answerHash
+            mathTopicId, Challenge.DifficultyLevel.Easy, keccak256("Question"), answerHash
         );
 
         vm.prank(alice);

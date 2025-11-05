@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import "forge-std/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import "../src/TopicRegistry.sol";
 
 contract TopicRegistryTest is Test {
@@ -17,7 +18,13 @@ contract TopicRegistryTest is Test {
     function setUp() public {
         vm.startPrank(admin);
 
-        topicRegistry = new TopicRegistry();
+        // Deploy implementation
+        TopicRegistry implementation = new TopicRegistry();
+
+        // Deploy proxy
+        bytes memory initData = abi.encodeWithSelector(TopicRegistry.initialize.selector, admin);
+        ERC1967Proxy proxy = new ERC1967Proxy(address(implementation), initData);
+        topicRegistry = TopicRegistry(address(proxy));
 
         // Create initial topics
         mathTopicId = topicRegistry.createTopic("Mathematics", 0);
