@@ -60,7 +60,7 @@ deploy-local:
 
 # Deploy all contracts to Sepolia testnet
 deploy-sepolia:
-    forge script script/Deploy.s.sol --rpc-url sepolia --broadcast --verify
+    forge script script/Deploy.s.sol --rpc-url $SEPOLIA_RPC_URL --account sepoliaKey --password-file .password --broadcast --verify
 
 # ===========================================
 # Individual Contract Deployments
@@ -72,7 +72,7 @@ deploy-contract CONTRACT NETWORK:
     if [ "{{NETWORK}}" = "local" ]; then
         forge script script/deploy/Deploy{{CONTRACT}}.s.sol --rpc-url http://localhost:8545 --broadcast
     elif [ "{{NETWORK}}" = "sepolia" ]; then
-        forge script script/deploy/Deploy{{CONTRACT}}.s.sol --rpc-url sepolia --broadcast --verify
+        forge script script/deploy/Deploy{{CONTRACT}}.s.sol --rpc-url $SEPOLIA_RPC_URL --account sepoliaKey --password-file .password --broadcast --verify
     else
         echo "Error: Network must be 'local' or 'sepolia'"
         exit 1
@@ -112,7 +112,7 @@ upgrade-contract CONTRACT NETWORK:
     if [ "{{NETWORK}}" = "local" ]; then
         forge script script/upgrade/Upgrade{{CONTRACT}}.s.sol --rpc-url http://localhost:8545 --broadcast
     elif [ "{{NETWORK}}" = "sepolia" ]; then
-        forge script script/upgrade/Upgrade{{CONTRACT}}.s.sol --rpc-url sepolia --broadcast --verify
+        forge script script/upgrade/Upgrade{{CONTRACT}}.s.sol --rpc-url $SEPOLIA_RPC_URL --account sepoliaKey --password-file .password --broadcast --verify
     else
         echo "Error: Network must be 'local' or 'sepolia'"
         exit 1
