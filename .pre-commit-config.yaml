@@ -40,14 +40,14 @@ repos:
         files: \.(sol|t\.sol)$
         pass_filenames: false
 
-  # # Forge coverage
-  # - repo: local
-  #   hooks:
-  #     - id: forge-coverage
-  #       name: Forge Coverage Check
-  #       entry: >-
-  #         bash -c 'coverage_output=$(forge coverage --report summary --ir-minimum 2>&1); src_coverage=$(echo "$coverage_output" | grep "src/" | awk -F"|" "{print \$3}" | awk -F"[()]" "NF>=2 {print \$2}" | awk -F"/" "{covered += \$1; total += \$2} END {if (total > 0) printf \"%.2f\", (covered / total) * 100; else print \"0\"}"); min_coverage=50; if [ -z "$src_coverage" ] || [ "$src_coverage" = "0" ]; then echo "❌ Could not parse src/ coverage"; echo "$coverage_output"; exit 1; fi; echo "src/ Coverage: ${src_coverage}%"; if (( $(echo "$src_coverage < $min_coverage" | bc -l) )); then echo "❌ src/ coverage ${src_coverage}% is below minimum ${min_coverage}%"; exit 1; fi; echo "✅ Coverage check passed (src/ files: ${src_coverage}%)"'
-  #       language: system
-  #       files: \.(sol|t\.sol)$
-  #       pass_filenames: false
-  #       verbose: true
+  # Forge coverage
+  - repo: local
+    hooks:
+      - id: forge-coverage
+        name: Forge Coverage Check
+        entry: >-
+          bash -c 'coverage_output=$(forge coverage --report summary --ir-minimum --no-match-coverage script 2>&1); src_coverage=$(echo "$coverage_output" | grep "src/" | awk -F"|" "{print \$3}" | awk -F"[()]" "NF>=2 {print \$2}" | awk -F"/" "{covered += \$1; total += \$2} END {if (total > 0) printf \"%.2f\", (covered / total) * 100; else print \"0\"}"); min_coverage=50; if [ -z "$src_coverage" ] || [ "$src_coverage" = "0" ]; then echo "❌ Could not parse src/ coverage"; echo "$coverage_output"; exit 1; fi; echo "src/ Coverage: ${src_coverage}%"; if (( $(echo "$src_coverage < $min_coverage" | bc -l) )); then echo "❌ src/ coverage ${src_coverage}% is below minimum ${min_coverage}%"; exit 1; fi; echo "✅ Coverage check passed (src/ files: ${src_coverage}%)"'
+        language: system
+        files: \.(sol|t\.sol)$
+        pass_filenames: false
+        verbose: true
