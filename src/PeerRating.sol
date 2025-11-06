@@ -171,10 +171,9 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         if (!isFirstRatingFromRater) {
             // Get the most recent rating timestamp
             uint64 lastRatingTimestamp = timestamps[timestamps.length - 1];
-            uint64 earliestAllowedTimestamp = timestamp - RATING_COOLDOWN_PERIOD;
 
             // Check if cooldown period has passed
-            if (lastRatingTimestamp > earliestAllowedTimestamp) {
+            if (timestamp < lastRatingTimestamp + RATING_COOLDOWN_PERIOD) {
                 revert RatedTooRecently(msg.sender, ratee, topicId, lastRatingTimestamp);
             }
         }
