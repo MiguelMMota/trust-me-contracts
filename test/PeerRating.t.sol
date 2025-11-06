@@ -234,7 +234,7 @@ contract PeerRatingTest is Test {
         peerRating.rateUser(bob, mathTopicId, 750);
 
         // Try to update before cooldown (only 100 days, need 182)
-        vm.warp(block.timestamp + 100 days);
+        vm.warp(firstTimestamp + 100 days);
 
         vm.prank(alice);
         vm.expectRevert(
@@ -244,17 +244,21 @@ contract PeerRatingTest is Test {
     }
 
     function testMultipleRatingUpdates() public {
+        uint64 t0 = uint64(block.timestamp);
+
         // First rating
         vm.prank(alice);
         peerRating.rateUser(bob, mathTopicId, 500);
 
         // Second rating after cooldown
-        vm.warp(block.timestamp + 183 days);
+        uint64 t1 = t0 + 183 days;
+        vm.warp(t1);
         vm.prank(alice);
         peerRating.rateUser(bob, mathTopicId, 700);
 
         // Third rating after another cooldown
-        vm.warp(block.timestamp + 183 days);
+        uint64 t2 = t1 + 183 days;
+        vm.warp(t2);
         vm.prank(alice);
         peerRating.rateUser(bob, mathTopicId, 900);
 
@@ -368,18 +372,19 @@ contract PeerRatingTest is Test {
     }
 
     function testGetRatingTimestamps() public {
-        uint256 startTime = block.timestamp;
+        uint64 startTime = uint64(block.timestamp);
         vm.prank(alice);
         peerRating.rateUser(bob, mathTopicId, 500);
 
-        vm.warp(startTime + 183 days);
+        uint64 secondTime = startTime + 183 days;
+        vm.warp(secondTime);
         vm.prank(alice);
         peerRating.rateUser(bob, mathTopicId, 700);
 
         uint64[] memory timestamps = peerRating.getRatingTimestamps(bob, mathTopicId, alice);
         assertEq(timestamps.length, 2);
-        assertEq(timestamps[0], uint64(startTime));
-        assertEq(timestamps[1], uint64(startTime + 183 days));
+        assertEq(timestamps[0], startTime);
+        assertEq(timestamps[1], secondTime);
     }
 
     function testGetUserTopicRating() public {
@@ -393,20 +398,22 @@ contract PeerRatingTest is Test {
     }
 
     function testGetUserTopicRatingAtTime() public {
-        // Alice rates Bob 500
+        // Alice rates Bob 500 at timestamp 1
         vm.prank(alice);
         peerRating.rateUser(bob, mathTopicId, 500);
 
-        uint64 timeAfterFirst = uint64(block.timestamp + 100 days);
+        // Set query time to be 50 days after first rating
+        uint64 queryTime = uint64(block.timestamp + 50 days);
 
-        // Charlie rates Bob 700
-        vm.warp(block.timestamp + 50 days);
+        // Warp forward 100 days (to timestamp 1 + 100 days = 8640001)
+        vm.warp(block.timestamp + 100 days);
+
+        // Charlie rates Bob 700 at timestamp (1 + 100 days = 8640001)
         vm.prank(charlie);
         peerRating.rateUser(bob, mathTopicId, 700);
 
-        // Query at time after first rating but before second
-        PeerRating.UserTopicRatings memory ratings =
-            peerRating.getUserTopicRatingAtTime(bob, mathTopicId, timeAfterFirst);
+        // Query at time after first rating but before second (at 1 + 50 days = 4320001)
+        PeerRating.UserTopicRatings memory ratings = peerRating.getUserTopicRatingAtTime(bob, mathTopicId, queryTime);
         assertEq(ratings.averageScore, 500);
         assertEq(ratings.totalRatings, 1);
     }
@@ -522,18 +529,19 @@ contract PeerRatingTest is Test {
 
     function testHistoricalRatingQuery() public {
         // Time T0: Alice rates Bob 300
+        uint64 t0 = uint64(block.timestamp);
         vm.prank(alice);
         peerRating.rateUser(bob, mathTopicId, 300);
 
         // Time T1: Charlie rates Bob 500
-        vm.warp(block.timestamp + 30 days);
-        uint64 t1 = uint64(block.timestamp);
+        uint64 t1 = t0 + 30 days;
+        vm.warp(t1);
         vm.prank(charlie);
         peerRating.rateUser(bob, mathTopicId, 500);
 
         // Time T2: Alice updates to 900
-        vm.warp(block.timestamp + 183 days);
-        uint64 t2 = uint64(block.timestamp);
+        uint64 t2 = t1 + 183 days;
+        vm.warp(t2);
         vm.prank(alice);
         peerRating.rateUser(bob, mathTopicId, 900);
 
@@ -605,7 +613,7 @@ contract PeerRatingTest is Test {
     function testGetRatingAtTimeBeforeAnyRating() public {
         uint64 queryTime = uint64(block.timestamp);
 
-        vm.warp(block.timestamp + 100 days);
+        vm.warp(queryTime + 100 days);
         vm.prank(alice);
         peerRating.rateUser(bob, mathTopicId, 800);
 
