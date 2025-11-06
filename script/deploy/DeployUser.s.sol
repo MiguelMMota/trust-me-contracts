@@ -55,7 +55,37 @@ contract DeployUser is Script, DeploymentConfig {
         return proxy;
     }
 
-    function fillData(address proxy) public {}
+    function fillData(address proxy) public {
+        console.log("\n=== Creating Test Users ===");
+
+        startBroadcast();
+
+        User userContract = User(proxy);
+
+        // Register 4 test users
+        address[4] memory testUsers = [
+            0xCDc986e956f889b6046F500657625E523f06D5F0,
+            0x13dbAD22Ae32aaa90F7E9173C1fA519c064E4d65,
+            0x28C02652dFc64202360E1A0B4f88FcedECB538a6,
+            0xCACCbe50c1D788031d774dd886DA8F5Dc225ee06
+        ];
+
+        for (uint256 i = 0; i < testUsers.length; i++) {
+            // Use vm.prank to register each user from their own address
+            vm.stopBroadcast();
+            vm.startPrank(testUsers[i]);
+            userContract.registerUser();
+            vm.stopPrank();
+            console.log("User", i + 1, "registered:", testUsers[i]);
+            startBroadcast();
+        }
+
+        vm.stopBroadcast();
+
+        console.log("=== User Registration Complete ===");
+        console.log("4 users have been registered");
+        console.log("===============================================\n");
+    }
 
     /**
      * @notice Deploys TopicRegistry with initial test data
