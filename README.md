@@ -45,6 +45,7 @@ TrustMe is a blockchain-based platform where users build domain-specific experti
 
 - [Foundry](https://book.getfoundry.sh/getting-started/installation)
 - Node.js (for ABIs integration with frontend)
+- [just](https://github.com/casey/just) (recommended for handy command aliases). Install on MacOS with `brew install justfile`
 
 ### Installation
 
