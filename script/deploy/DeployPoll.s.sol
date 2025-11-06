@@ -14,7 +14,6 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
  */
 contract DeployPoll is Script, DeploymentConfig {
     function run() external returns (address proxy) {
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = getDeployer();
 
         console.log("\n=== Deploying Poll ===");
@@ -65,6 +64,21 @@ contract DeployPoll is Script, DeploymentConfig {
         updateContractAddress("Poll", proxy);
 
         console.log("=== Poll Deployment Complete ===\n");
+
+        return proxy;
+    }
+
+    function fillData(address proxy) public {}
+
+    /**
+     * @notice Deploys TopicRegistry with initial test data
+     * @dev Creates a predefined topic hierarchy for testing/development
+     * @return proxy The address of the deployed proxy contract
+     */
+    function runWithData() external returns (address proxy) {
+        // First deploy the contract
+        proxy = this.run();
+        this.fillData(proxy);
 
         return proxy;
     }

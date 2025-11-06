@@ -54,4 +54,19 @@ contract DeployUser is Script, DeploymentConfig {
 
         return proxy;
     }
+
+    function fillData(address proxy) public {}
+
+    /**
+     * @notice Deploys TopicRegistry with initial test data
+     * @dev Creates a predefined topic hierarchy for testing/development
+     * @return proxy The address of the deployed proxy contract
+     */
+    function runWithData() external returns (address proxy) {
+        // First deploy the contract
+        proxy = this.run();
+        this.fillData(proxy);
+
+        return proxy;
+    }
 }

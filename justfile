@@ -39,6 +39,18 @@ deploy CONTRACT NETWORK:
         exit 1
     fi
 
+# Deploy single contract to specified network (local or sepolia), and fill some test data
+deploy-data CONTRACT NETWORK:
+    #!/usr/bin/env bash
+    if [ "{{NETWORK}}" = "local" ]; then
+        forge script script/deploy/Deploy{{CONTRACT}}.s.sol --rpc-url http://localhost:8545 --broadcast --sig "runWithData()"
+    elif [ "{{NETWORK}}" = "sepolia" ]; then
+        forge script script/deploy/Deploy{{CONTRACT}}.s.sol --rpc-url $SEPOLIA_RPC_URL --account sepoliaKey --password-file .password --broadcast --verify --sig "runWithData()"
+    else
+        echo "Error: Network must be 'local' or 'sepolia'"
+        exit 1
+    fi
+
 # ===========================================
 # Contract Upgrades
 # ===========================================
