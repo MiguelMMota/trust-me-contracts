@@ -71,3 +71,6 @@ upgrade CONTRACT NETWORK:
 # Show contract sizes
 size:
     forge build --sizes
+
+coverage:
+    forge coverage --no-match-coverage script
