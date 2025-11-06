@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "forge-std/Test.sol";
+import {Test, console} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import "../src/TopicRegistry.sol";
-import "../src/User.sol";
-import "../src/Challenge.sol";
-import "../src/ReputationEngine.sol";
+import {TopicRegistry} from "../src/TopicRegistry.sol";
+import {User} from "../src/User.sol";
+import {Challenge} from "../src/Challenge.sol";
+import {ReputationEngine} from "../src/ReputationEngine.sol";
 
 contract ReputationEngineTest is Test {
     TopicRegistry public topicRegistry;

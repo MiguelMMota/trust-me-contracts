@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import "./User.sol";
-import "./Challenge.sol";
-import "./TopicRegistry.sol";
-import "./PeerRating.sol";
+import {User} from "./User.sol";
+import {Challenge} from "./Challenge.sol";
+import {TopicRegistry} from "./TopicRegistry.sol";
+import {PeerRating} from "./PeerRating.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";

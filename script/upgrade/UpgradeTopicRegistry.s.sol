@@ -3,7 +3,6 @@ pragma solidity ^0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
-import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {TopicRegistry} from "../../src/TopicRegistry.sol";
 import {DeploymentConfig} from "../config/DeploymentConfig.sol";
 
@@ -13,7 +12,6 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
  */
 contract UpgradeTopicRegistry is Script, DeploymentConfig {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         address deployer = getDeployer();
 
         console.log("\n=== Upgrading TopicRegistry ===");

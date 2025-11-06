@@ -8,7 +8,6 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
 
 contract UpgradePoll is Script, DeploymentConfig {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         console.log("\n=== Upgrading Poll ===");
         console.log("Network:", getNetworkName());
 

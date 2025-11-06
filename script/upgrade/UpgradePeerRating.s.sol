@@ -8,7 +8,6 @@ import {DeploymentConfig} from "../config/DeploymentConfig.sol";
 
 contract UpgradePeerRating is Script, DeploymentConfig {
     function run() external {
-        uint256 deployerPrivateKey = vm.envUint("DEPLOYER_PRIVATE_KEY");
         console.log("\n=== Upgrading PeerRating ===");
         console.log("Network:", getNetworkName());
 
