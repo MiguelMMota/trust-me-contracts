@@ -1,0 +1,2 @@
+# Deployment configurations will be stored here
+# Format: {network}.json (e.g., anvil.json, sepolia.json)
