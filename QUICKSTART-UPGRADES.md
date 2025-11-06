@@ -7,10 +7,10 @@
 just deploy-local
 
 # Deploy just one contract
-just deploy-contract Poll local
+just deploy Poll local
 
 # Upgrade just one contract (preserves address & data!)
-just upgrade-contract Poll local
+just upgrade Poll local
 
 # Check what's deployed
 cat deployments/anvil.json
@@ -22,7 +22,7 @@ cat deployments/anvil.json
 
 ```bash
 # Terminal 1: Start local blockchain
-just anvil
+forge anvil
 
 # Terminal 2: Deploy all contracts
 just deploy-local
@@ -41,10 +41,10 @@ Let's say you found a bug in `Poll.sol`:
 vim src/Poll.sol
 
 # 2. Test it
-just test
+forge test
 
 # 3. Upgrade ONLY Poll (not everything!)
-just upgrade-poll-local
+just upgrade Poll local
 ```
 
 **Result:**
@@ -64,10 +64,10 @@ You want to add a new function to `User.sol`:
 # (Make sure you add storage variables at the END)
 
 # 2. Test it
-just test
+forge test
 
 # 3. Upgrade User
-just upgrade-user-local
+just upgrade User local
 ```
 
 **Result:** New function available, all existing users and data intact
@@ -81,7 +81,7 @@ just upgrade-user-local
 just deploy-sepolia
 
 # Or upgrade one contract on Sepolia
-just upgrade-contract Poll sepolia
+just upgrade Poll sepolia
 ```
 
 **Result:** Deployed/upgraded on Sepolia with Etherscan verification
@@ -144,37 +144,19 @@ just deploy-sepolia    # Deploy all to Sepolia testnet
 
 ### Individual Contract Deployment
 ```bash
-# Generic form
-just deploy-contract <ContractName> <network>
-
-# Specific shortcuts
-just deploy-topic-registry-local
-just deploy-user-local
-just deploy-challenge-local
-just deploy-peer-rating-local
-just deploy-reputation-engine-local
-just deploy-poll-local
+just deploy <ContractName> <network>
 ```
 
 ### Contract Upgrades
 ```bash
-# Generic form
-just upgrade-contract <ContractName> <network>
-
-# Specific shortcuts
-just upgrade-topic-registry-local
-just upgrade-user-local
-just upgrade-challenge-local
-just upgrade-peer-rating-local
-just upgrade-reputation-engine-local
-just upgrade-poll-local
+just upgrade <ContractName> <network>
 ```
 
 ### Other Useful Commands
 ```bash
-just test              # Run tests
-just build             # Build contracts
-just fmt               # Format code
+forge test              # Run tests
+forge build             # Build contracts
+forge fmt               # Format code
 just --list            # See all commands
 ```
 
@@ -230,7 +212,7 @@ The full `just deploy-local` handles this automatically.
 
 ```bash
 # 1. Start fresh local node
-just anvil
+anvil
 
 # 2. Deploy everything (in another terminal)
 just deploy-local
@@ -242,10 +224,10 @@ cat deployments/anvil.json
 vim src/Poll.sol
 
 # 5. Test your changes
-just test
+forge test
 
 # 6. Upgrade just Poll
-just upgrade-poll-local
+just upgrade Poll local
 
 # 7. Done! Poll has new logic, same address, all data intact
 ```

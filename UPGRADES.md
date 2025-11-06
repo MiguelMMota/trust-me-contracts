@@ -90,24 +90,12 @@ This will:
 Deploy a single contract (useful when only one contract changes):
 
 ```bash
-# Generic command
-just deploy-contract <ContractName> <network>
+just deploy <ContractName> <network>
 
 # Examples:
-just deploy-contract TopicRegistry local
-just deploy-contract User sepolia
-just deploy-contract Poll local
-```
-
-Or use specific commands:
-
-```bash
-just deploy-topic-registry-local
-just deploy-user-local
-just deploy-challenge-local
-just deploy-peer-rating-local
-just deploy-reputation-engine-local
-just deploy-poll-local
+just deploy TopicRegistry local
+just deploy User sepolia
+just deploy Poll local
 ```
 
 **Dependencies:** Contracts with dependencies must have their dependencies deployed first:
@@ -122,24 +110,12 @@ just deploy-poll-local
 When you update a contract's logic, upgrade just that contract:
 
 ```bash
-# Generic command
-just upgrade-contract <ContractName> <network>
+just upgrade <ContractName> <network>
 
 # Examples:
-just upgrade-contract TopicRegistry local
-just upgrade-contract User sepolia
-just upgrade-contract Poll local
-```
-
-Or use specific commands:
-
-```bash
-just upgrade-topic-registry-local
-just upgrade-user-local
-just upgrade-challenge-local
-just upgrade-peer-rating-local
-just upgrade-reputation-engine-local
-just upgrade-poll-local
+just upgrade TopicRegistry local
+just upgrade User sepolia
+just upgrade Poll local
 ```
 
 **Important:** Upgrades preserve:
@@ -153,7 +129,7 @@ just upgrade-poll-local
 
 ```bash
 # Start local node
-just anvil
+anvil
 
 # In another terminal, deploy everything
 just deploy-local
@@ -168,10 +144,10 @@ Let's say you fix a bug in the Poll contract:
 ```bash
 # 1. Edit src/Poll.sol
 # 2. Test your changes
-just test
+forge test
 
 # 3. Upgrade just the Poll contract
-just upgrade-poll-local
+just upgrade Poll local
 ```
 
 Result: Poll logic updated, address unchanged, all data preserved
@@ -181,11 +157,9 @@ Result: Poll logic updated, address unchanged, all data preserved
 You only need to deploy User for testing:
 
 ```bash
-# 1. Deploy TopicRegistry (dependency)
-just deploy-topic-registry-local
-
-# 2. Deploy User
-just deploy-user-local
+# 1. Deploy TopicRegistry (dependency), then User
+just deploy TopicRegistry local
+just deploy User local
 ```
 
 Result: Only those 2 contracts deployed, no wasted gas on others
@@ -267,14 +241,14 @@ Only the **owner** of each contract can authorize upgrades via the `_authorizeUp
 
 1. **Test the full deployment:**
    ```bash
-   just anvil  # Terminal 1
+   anvil  # Terminal 1
    just deploy-local  # Terminal 2
    ```
 
 2. **Test individual deployments:**
    ```bash
-   just deploy-topic-registry-local
-   just deploy-user-local
+   just deploy TopicRegistry local
+   just deploy User local
    ```
 
 3. **Test upgrades:**
