@@ -3,17 +3,14 @@ pragma solidity ^0.8.24;
 
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
-import {User} from "../src/User.sol";
 import {Challenge} from "../src/Challenge.sol";
 import {PeerRating} from "../src/PeerRating.sol";
+import {Poll} from "../src/Poll.sol";
 import {ReputationEngine} from "../src/ReputationEngine.sol";
+import {TopicRegistry} from "../src/TopicRegistry.sol";
+import {User} from "../src/User.sol";
 import {DeploymentConfig} from "./config/DeploymentConfig.sol";
-import {DeployTopicRegistry} from "./deploy/DeployTopicRegistry.s.sol";
-import {DeployUser} from "./deploy/DeployUser.s.sol";
-import {DeployChallenge} from "./deploy/DeployChallenge.s.sol";
-import {DeployPeerRating} from "./deploy/DeployPeerRating.s.sol";
-import {DeployReputationEngine} from "./deploy/DeployReputationEngine.s.sol";
-import {DeployPoll} from "./deploy/DeployPoll.s.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 
 /**
  * @title DeployScript
@@ -33,41 +30,32 @@ contract DeployScript is Script, DeploymentConfig {
         console.log("===============================================\n");
 
         // Deploy all contracts using individual scripts
-        DeployTopicRegistry topicRegistryDeployer = new DeployTopicRegistry();
-        topicRegistryDeployer.runWithData();
-
-        DeployUser userDeployer = new DeployUser();
-        address userContract = userDeployer.runWithData();
-
-        DeployChallenge challengeDeployer = new DeployChallenge();
-        address challengeContract = challengeDeployer.runWithData();
-
-        DeployPeerRating peerRatingDeployer = new DeployPeerRating();
-        address peerRatingContract = peerRatingDeployer.runWithData();
-
-        DeployReputationEngine reputationEngineDeployer = new DeployReputationEngine();
-        address reputationEngine = reputationEngineDeployer.runWithData();
-
-        DeployPoll pollDeployer = new DeployPoll();
-        pollDeployer.runWithData();
+        // Each deployer handles its own broadcasting
+        deployTopicRegistry(deployer);
+        address userContract = deployUser(deployer);
+        address challengeContract = deployChallenge(deployer);
+        address peerRatingContract = deployPeerRating(deployer);
+        address reputationEngineContract = deployReputationEngine(deployer);
+        deployPoll(deployer);
 
         // Set cross-contract references
         console.log("\n=== Setting Cross-Contract References ===");
-        vm.startBroadcast();
 
-        User(userContract).setReputationEngine(reputationEngine);
+        vm.startBroadcast(deployer);
+
+        User(userContract).setReputationEngine(reputationEngineContract);
         console.log("User.setReputationEngine()");
 
         User(userContract).setPeerRatingContract(peerRatingContract);
         console.log("User.setPeerRatingContract()");
 
-        Challenge(challengeContract).setReputationEngine(reputationEngine);
+        Challenge(challengeContract).setReputationEngine(reputationEngineContract);
         console.log("Challenge.setReputationEngine()");
 
-        PeerRating(peerRatingContract).setReputationEngine(reputationEngine);
+        PeerRating(peerRatingContract).setReputationEngine(reputationEngineContract);
         console.log("PeerRating.setReputationEngine()");
 
-        ReputationEngine(reputationEngine).setPeerRatingContract(peerRatingContract);
+        ReputationEngine(reputationEngineContract).setPeerRatingContract(peerRatingContract);
         console.log("ReputationEngine.setPeerRatingContract()");
 
         console.log("=== Cross-Contract References Complete ===\n");
@@ -82,6 +70,452 @@ contract DeployScript is Script, DeploymentConfig {
         console.log("===============================================");
         console.log("\nDeployment complete! Config saved to:");
         console.log(getDeploymentPath());
+        console.log("===============================================\n");
+    }
+
+    function deployChallenge(address deployer) private returns (address proxy) {
+        console.log("\n=== Deploying Challenge ===");
+        console.log("Deployer:", deployer);
+        console.log("Network:", getNetworkName());
+
+        // Check dependencies
+        if (!isDeployed("TopicRegistry")) {
+            revert("TopicRegistry must be deployed first");
+        }
+        if (!isDeployed("User")) {
+            revert("User must be deployed first");
+        }
+
+        address topicRegistry = getContractAddress("TopicRegistry");
+        address user = getContractAddress("User");
+        console.log("Using TopicRegistry at:", topicRegistry);
+        console.log("Using User at:", user);
+
+        vm.startBroadcast(deployer);
+
+        // 1. Deploy implementation
+        Challenge implementation = new Challenge();
+        console.log("Implementation deployed at:", address(implementation));
+
+        // 2. Encode initialize function call
+        bytes memory initData = abi.encodeWithSelector(
+            Challenge.initialize.selector,
+            deployer, // initialOwner
+            topicRegistry, // _topicRegistry
+            user // _userContract
+        );
+
+        // 3. Deploy proxy
+        ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
+        proxy = address(proxyContract);
+        console.log("Proxy deployed at:", proxy);
+
+        vm.stopBroadcast();
+
+        // 4. Save deployment
+        updateContractAddress("Challenge", proxy);
+
+        console.log("=== Challenge Deployment Complete ===\n");
+
+        return proxy;
+    }
+
+    function deployPeerRating(address deployer) private returns (address proxy) {
+        console.log("\n=== Deploying PeerRating ===");
+        console.log("Deployer:", deployer);
+        console.log("Network:", getNetworkName());
+
+        // Check dependencies
+        if (!isDeployed("TopicRegistry")) {
+            revert("TopicRegistry must be deployed first");
+        }
+        if (!isDeployed("User")) {
+            revert("User must be deployed first");
+        }
+
+        address topicRegistry = getContractAddress("TopicRegistry");
+        address user = getContractAddress("User");
+        console.log("Using TopicRegistry at:", topicRegistry);
+        console.log("Using User at:", user);
+
+        vm.startBroadcast(deployer);
+
+        // 1. Deploy implementation
+        PeerRating implementation = new PeerRating();
+        console.log("Implementation deployed at:", address(implementation));
+
+        // 2. Encode initialize function call
+        bytes memory initData = abi.encodeWithSelector(
+            PeerRating.initialize.selector,
+            deployer, // initialOwner
+            topicRegistry, // _topicRegistry
+            user // _userContract
+        );
+
+        // 3. Deploy proxy
+        ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
+        proxy = address(proxyContract);
+        console.log("Proxy deployed at:", proxy);
+
+        vm.stopBroadcast();
+
+        // 4. Save deployment
+        updateContractAddress("PeerRating", proxy);
+
+        console.log("=== PeerRating Deployment Complete ===\n");
+
+        fillPeerRatingData(proxy, deployer);
+
+        return proxy;
+    }
+
+    function deployPoll(address deployer) private returns (address proxy) {
+        console.log("\n=== Deploying Poll ===");
+        console.log("Deployer:", deployer);
+        console.log("Network:", getNetworkName());
+
+        // Check dependencies
+        if (!isDeployed("User")) {
+            revert("User must be deployed first");
+        }
+        if (!isDeployed("ReputationEngine")) {
+            revert("ReputationEngine must be deployed first");
+        }
+        if (!isDeployed("TopicRegistry")) {
+            revert("TopicRegistry must be deployed first");
+        }
+
+        address user = getContractAddress("User");
+        address reputationEngine = getContractAddress("ReputationEngine");
+        address topicRegistry = getContractAddress("TopicRegistry");
+        console.log("Using User at:", user);
+        console.log("Using ReputationEngine at:", reputationEngine);
+        console.log("Using TopicRegistry at:", topicRegistry);
+
+        vm.startBroadcast(deployer);
+
+        // 1. Deploy implementation
+        Poll implementation = new Poll();
+        console.log("Implementation deployed at:", address(implementation));
+
+        // 2. Encode initialize function call
+        bytes memory initData = abi.encodeWithSelector(
+            Poll.initialize.selector,
+            deployer, // initialOwner
+            user, // _userContract
+            reputationEngine, // _reputationEngine
+            topicRegistry // _topicRegistry
+        );
+
+        // 3. Deploy proxy
+        ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
+        proxy = address(proxyContract);
+        console.log("Proxy deployed at:", proxy);
+
+        vm.stopBroadcast();
+
+        // 4. Save deployment
+        updateContractAddress("Poll", proxy);
+
+        console.log("=== Poll Deployment Complete ===\n");
+
+        return proxy;
+    }
+
+    function deployReputationEngine(address deployer) private returns (address proxy) {
+        console.log("\n=== Deploying ReputationEngine ===");
+        console.log("Deployer:", deployer);
+        console.log("Network:", getNetworkName());
+
+        // Check dependencies
+        if (!isDeployed("User")) {
+            revert("User must be deployed first");
+        }
+        if (!isDeployed("Challenge")) {
+            revert("Challenge must be deployed first");
+        }
+        if (!isDeployed("TopicRegistry")) {
+            revert("TopicRegistry must be deployed first");
+        }
+
+        address user = getContractAddress("User");
+        address challenge = getContractAddress("Challenge");
+        address topicRegistry = getContractAddress("TopicRegistry");
+        console.log("Using User at:", user);
+        console.log("Using Challenge at:", challenge);
+        console.log("Using TopicRegistry at:", topicRegistry);
+
+        vm.startBroadcast(deployer);
+
+        // 1. Deploy implementation
+        ReputationEngine implementation = new ReputationEngine();
+        console.log("Implementation deployed at:", address(implementation));
+
+        // 2. Encode initialize function call
+        bytes memory initData = abi.encodeWithSelector(
+            ReputationEngine.initialize.selector,
+            deployer, // initialOwner
+            user, // _userContract
+            challenge, // _challengeContract
+            topicRegistry // _topicRegistry
+        );
+
+        // 3. Deploy proxy
+        ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
+        proxy = address(proxyContract);
+        console.log("Proxy deployed at:", proxy);
+
+        vm.stopBroadcast();
+
+        // 4. Save deployment
+        updateContractAddress("ReputationEngine", proxy);
+
+        console.log("=== ReputationEngine Deployment Complete ===\n");
+
+        return proxy;
+    }
+
+    function deployTopicRegistry(address deployer) private returns (address proxy) {
+        console.log("\n=== Deploying TopicRegistry ===");
+        console.log("Deployer:", deployer);
+        console.log("Network:", getNetworkName());
+
+        vm.startBroadcast(deployer);
+
+        // 1. Deploy implementation
+        TopicRegistry implementation = new TopicRegistry();
+        console.log("Implementation deployed at:", address(implementation));
+
+        // 2. Encode initialize function call
+        bytes memory initData = abi.encodeWithSelector(
+            TopicRegistry.initialize.selector,
+            deployer // initialOwner
+        );
+
+        // 3. Deploy proxy
+        ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
+        proxy = address(proxyContract);
+        console.log("Proxy deployed at:", proxy);
+
+        vm.stopBroadcast();
+
+        // 4. Save deployment
+        updateContractAddress("TopicRegistry", proxy);
+
+        console.log("=== TopicRegistry Deployment Complete ===\n");
+
+        fillTopicRegistryData(proxy, deployer);
+
+        return proxy;
+    }
+
+    function deployUser(address deployer) private returns (address proxy) {
+        console.log("\n=== Deploying User ===");
+        console.log("Deployer:", deployer);
+        console.log("Network:", getNetworkName());
+
+        // Check if TopicRegistry is deployed
+        if (!isDeployed("TopicRegistry")) {
+            revert("TopicRegistry must be deployed first");
+        }
+        address topicRegistry = getContractAddress("TopicRegistry");
+        console.log("Using TopicRegistry at:", topicRegistry);
+
+        vm.startBroadcast(deployer);
+
+        // 1. Deploy implementation
+        User implementation = new User();
+        console.log("Implementation deployed at:", address(implementation));
+
+        // 2. Encode initialize function call
+        bytes memory initData = abi.encodeWithSelector(
+            User.initialize.selector,
+            deployer, // initialOwner
+            topicRegistry // _topicRegistry
+        );
+
+        // 3. Deploy proxy
+        ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
+        proxy = address(proxyContract);
+        console.log("Proxy deployed at:", proxy);
+
+        vm.stopBroadcast();
+
+        // 4. Save deployment
+        updateContractAddress("User", proxy);
+
+        console.log("=== User Deployment Complete ===\n");
+
+        fillUserData(proxy, deployer);
+
+        return proxy;
+    }
+
+    function fillPeerRatingData(address proxy, address deployer) private {
+        console.log("\n=== Creating Peer Ratings ===");
+
+        PeerRating peerRatingContract = PeerRating(proxy);
+
+        // Define the 4 test users
+        address[4] memory testUsers = [
+            0xCDc986e956f889b6046F500657625E523f06D5F0,
+            0x13dbAD22Ae32aaa90F7E9173C1fA519c064E4d65,
+            0x28C02652dFc64202360E1A0B4f88FcedECB538a6,
+            0xCACCbe50c1D788031d774dd886DA8F5Dc225ee06
+        ];
+
+        // Topic IDs from TopicRegistry (based on DeployTopicRegistry.fillData)
+        // We have 13 topics total. 90% coverage = 12 topics
+        // We'll select 12 topics (excluding one for variety)
+        uint32[12] memory topicIds = [
+            uint32(1), // Mathematics
+            uint32(2), // Algebra
+            uint32(3), // Calculus
+            uint32(4), // History
+            uint32(5), // World History
+            uint32(6), // Languages
+            uint32(7), // English
+            uint32(8), // Spanish
+            uint32(9), // Software Engineering
+            uint32(10), // Frontend Development
+            uint32(11), // Backend Development
+            uint32(13) // Blockchain Development (skipping Python #12 for 90% coverage)
+        ];
+
+        // Each user rates the other 3 users on 90% of topics (12 topics)
+        uint256 totalRatings = 0;
+
+        // this has to be done in a flat list to prevent "too deep in the stack" errors
+        uint256 i = 0;
+        totalRatings += _createRatingsForUser(peerRatingContract, testUsers, testUsers[i], i, topicIds);
+
+        i++;
+        totalRatings += _createRatingsForUser(peerRatingContract, testUsers, testUsers[i], i, topicIds);
+
+        i++;
+        totalRatings += _createRatingsForUser(peerRatingContract, testUsers, testUsers[i], i, topicIds);
+
+        i++;
+        totalRatings += _createRatingsForUser(peerRatingContract, testUsers, testUsers[i], i, topicIds);
+
+        console.log("=== Peer Ratings Complete ===");
+        console.log("Total ratings created:", totalRatings);
+        console.log("Each user rated 3 other users on 12 topics");
+        console.log("Coverage: 12/13 topics = 92.3%");
+        console.log("===============================================\n");
+    }
+
+    function _createRatingsForUser(
+        PeerRating peerRatingContract,
+        address[4] memory testUsers,
+        address rater,
+        uint256 raterIdx,
+        uint32[12] memory topicIds
+    ) private returns (uint256 ratingsCreated) {
+        ratingsCreated = 0;
+
+        vm.startPrank(rater);
+
+        for (uint256 rateeIdx = 0; rateeIdx < testUsers.length; rateeIdx++) {
+            // Skip self-rating
+            if (raterIdx == rateeIdx) continue;
+
+            address ratee = testUsers[rateeIdx];
+
+            // Rate on 12 topics (90% of 13)
+            for (uint256 topicIdx = 0; topicIdx < topicIds.length; topicIdx++) {
+                // Generate pseudo-random scores between 300-900 for variety
+                uint16 score = uint16(300 + ((raterIdx * 100 + rateeIdx * 50 + topicIdx * 30) % 600));
+
+                peerRatingContract.rateUser(ratee, topicIds[topicIdx], score);
+
+                ratingsCreated++;
+            }
+        }
+
+        vm.stopPrank();
+
+        console.log("User", raterIdx + 1, "completed ratings");
+    }
+
+    function fillTopicRegistryData(address proxy, address deployer) private {
+        console.log("\n=== Creating Initial Topic Hierarchy ===");
+
+        vm.startBroadcast(deployer);
+
+        TopicRegistry topicRegistry = TopicRegistry(proxy);
+
+        // Create initial topic hierarchy
+        uint32 mathId = topicRegistry.createTopic("Mathematics", 0);
+        uint32 algebraId = topicRegistry.createTopic("Algebra", mathId);
+        uint32 calculusId = topicRegistry.createTopic("Calculus", mathId);
+
+        uint32 historyId = topicRegistry.createTopic("History", 0);
+        uint32 worldHistoryId = topicRegistry.createTopic("World History", historyId);
+
+        uint32 languagesId = topicRegistry.createTopic("Languages", 0);
+        uint32 englishId = topicRegistry.createTopic("English", languagesId);
+        uint32 spanishId = topicRegistry.createTopic("Spanish", languagesId);
+
+        uint32 softwareId = topicRegistry.createTopic("Software Engineering", 0);
+        uint32 frontendId = topicRegistry.createTopic("Frontend Development", softwareId);
+        uint32 backendId = topicRegistry.createTopic("Backend Development", softwareId);
+        uint32 pythonId = topicRegistry.createTopic("Python", backendId);
+        uint32 blockchainId = topicRegistry.createTopic("Blockchain Development", softwareId);
+
+        console.log("Created 13 topics across 4 root categories");
+
+        vm.stopBroadcast();
+
+        console.log("=== Topic Hierarchy Complete ===");
+        console.log("Topics Created:");
+        console.log("  - Mathematics (", mathId, ")");
+        console.log("    - Algebra (", algebraId, ")");
+        console.log("    - Calculus (", calculusId, ")");
+        console.log("  - History (", historyId, ")");
+        console.log("    - World History (", worldHistoryId, ")");
+        console.log("  - Languages (", languagesId, ")");
+        console.log("    - English (", englishId, ")");
+        console.log("    - Spanish (", spanishId, ")");
+        console.log("  - Software Engineering (", softwareId, ")");
+        console.log("    - Frontend Development (", frontendId, ")");
+        console.log("    - Backend Development (", backendId, ")");
+        console.log("      - Python (", pythonId, ")");
+        console.log("    - Blockchain Development (", blockchainId, ")");
+        console.log("===============================================\n");
+    }
+
+    function fillUserData(address proxy, address deployer) private {
+        console.log("\n=== Creating Test Users ===");
+
+        vm.startBroadcast(deployer);
+
+        User userContract = User(proxy);
+
+        // Register 4 test users
+        address[4] memory testUsers = [
+            0xCDc986e956f889b6046F500657625E523f06D5F0,
+            0x13dbAD22Ae32aaa90F7E9173C1fA519c064E4d65,
+            0x28C02652dFc64202360E1A0B4f88FcedECB538a6,
+            0xCACCbe50c1D788031d774dd886DA8F5Dc225ee06
+        ];
+
+        for (uint256 i = 0; i < testUsers.length; i++) {
+            // Use vm.prank to register each user from their own address
+
+            vm.stopBroadcast();
+            vm.startPrank(testUsers[i]);
+            userContract.registerUser();
+            vm.stopPrank();
+            console.log("User", i + 1, "registered:", testUsers[i]);
+
+            vm.startBroadcast(deployer);
+        }
+
+        vm.stopBroadcast();
+
+        console.log("=== User Registration Complete ===");
+        console.log("4 users have been registered");
         console.log("===============================================\n");
     }
 }
