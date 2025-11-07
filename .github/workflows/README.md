@@ -1,11 +1,11 @@
 # Automated Deployment Pipeline
 
-This repository uses GitHub Actions to automatically detect and upgrade contracts when changes are pushed to the `main` or `master` branch.
+This repository uses GitHub Actions to automatically detect and upgrade contracts when changes are pushed to the `main` branch.
 
 ## How It Works
 
 ### 1. Change Detection
-When you push to `main`/`master`, the workflow:
+When you push to `main`, the workflow:
 - Compares the current commit with the previous commit
 - Identifies which `.sol` files in `src/` have changed
 - Maps changed files to their respective upgrade scripts
@@ -62,7 +62,7 @@ Ensure your `deployments/sepolia.json` exists with proxy addresses:
 ## Workflow Triggers
 
 The deployment workflow triggers on:
-- Push to `main` or `master` branch
+- Push to `main` branch
 - Only when files in `src/*.sol` are modified
 
 ## Manual Deployment
