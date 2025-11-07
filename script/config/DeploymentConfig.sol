@@ -4,12 +4,21 @@ pragma solidity ^0.8.24;
 import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 
+contract ServerConstants {
+    address public constant FOUNDRY_DEFAULT_SENDER = 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38;
+
+    address public constant SEPOLIA_TEST_ACCOUNT = 0xCDc986e956f889b6046F500657625E523f06D5F0;
+
+    uint256 public constant LOCAL_CHAIN_ID = 31337;
+    uint256 public constant SEPOLIA_ETH_CHAIN_ID = 11_155_111;
+}
+
 /**
  * @title DeploymentConfig
  * @notice Manages deployed contract addresses across different networks
  * @dev Provides helpers to read/write deployment addresses from JSON files
  */
-abstract contract DeploymentConfig is Script {
+abstract contract DeploymentConfig is Script, ServerConstants {
     /*//////////////////////////
           STRUCTS
     //////////////////////////*/
@@ -39,7 +48,11 @@ abstract contract DeploymentConfig is Script {
      *      When using DEPLOYER_PRIVATE_KEY env var, derive from private key
      */
     function getDeployer() internal view returns (address) {
-        return msg.sender;
+        if (block.chainid == SEPOLIA_ETH_CHAIN_ID) {
+            return SEPOLIA_TEST_ACCOUNT;
+        } else {
+            return FOUNDRY_DEFAULT_SENDER;
+        }
     }
 
     /**
