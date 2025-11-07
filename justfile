@@ -1,3 +1,6 @@
+# Load environment variables from .env file
+set dotenv-load
+
 # Default recipe (show available commands)
 default:
     @just --list
