@@ -53,7 +53,7 @@ contract DeployScript is Script, DeploymentConfig {
 
         // Set cross-contract references
         console.log("\n=== Setting Cross-Contract References ===");
-        startBroadcast();
+        vm.startBroadcast();
 
         User(userContract).setReputationEngine(reputationEngine);
         console.log("User.setReputationEngine()");

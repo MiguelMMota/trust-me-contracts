@@ -38,7 +38,7 @@ contract DeployReputationEngine is Script, DeploymentConfig {
         console.log("Using Challenge at:", challenge);
         console.log("Using TopicRegistry at:", topicRegistry);
 
-        startBroadcast();
+        vm.startBroadcast();
 
         // 1. Deploy implementation
         ReputationEngine implementation = new ReputationEngine();

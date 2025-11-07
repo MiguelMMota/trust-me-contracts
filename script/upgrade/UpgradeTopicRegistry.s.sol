@@ -25,7 +25,7 @@ contract UpgradeTopicRegistry is Script, DeploymentConfig {
         address proxy = getContractAddress("TopicRegistry");
         console.log("Proxy address:", proxy);
 
-        startBroadcast();
+        vm.startBroadcast();
 
         // 1. Deploy new implementation
         TopicRegistry newImplementation = new TopicRegistry();

@@ -15,7 +15,7 @@ contract UpgradeReputationEngine is Script, DeploymentConfig {
         address proxy = getContractAddress("ReputationEngine");
         console.log("Proxy address:", proxy);
 
-        startBroadcast();
+        vm.startBroadcast();
         ReputationEngine newImplementation = new ReputationEngine();
         console.log("New implementation:", address(newImplementation));
         ReputationEngine(proxy).upgradeToAndCall(address(newImplementation), "");

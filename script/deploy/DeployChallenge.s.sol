@@ -33,7 +33,7 @@ contract DeployChallenge is Script, DeploymentConfig {
         console.log("Using TopicRegistry at:", topicRegistry);
         console.log("Using User at:", user);
 
-        startBroadcast();
+        vm.startBroadcast();
 
         // 1. Deploy implementation
         Challenge implementation = new Challenge();

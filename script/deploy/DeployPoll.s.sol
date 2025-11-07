@@ -38,7 +38,7 @@ contract DeployPoll is Script, DeploymentConfig {
         console.log("Using ReputationEngine at:", reputationEngine);
         console.log("Using TopicRegistry at:", topicRegistry);
 
-        startBroadcast();
+        vm.startBroadcast();
 
         // 1. Deploy implementation
         Poll implementation = new Poll();

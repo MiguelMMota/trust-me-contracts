@@ -15,7 +15,7 @@ contract UpgradePoll is Script, DeploymentConfig {
         address proxy = getContractAddress("Poll");
         console.log("Proxy address:", proxy);
 
-        startBroadcast();
+        vm.startBroadcast();
         Poll newImplementation = new Poll();
         console.log("New implementation:", address(newImplementation));
         Poll(proxy).upgradeToAndCall(address(newImplementation), "");

@@ -15,7 +15,7 @@ contract UpgradeChallenge is Script, DeploymentConfig {
         address proxy = getContractAddress("Challenge");
         console.log("Proxy address:", proxy);
 
-        startBroadcast();
+        vm.startBroadcast();
         Challenge newImplementation = new Challenge();
         console.log("New implementation:", address(newImplementation));
         Challenge(proxy).upgradeToAndCall(address(newImplementation), "");

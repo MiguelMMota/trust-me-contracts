@@ -15,7 +15,7 @@ contract UpgradePeerRating is Script, DeploymentConfig {
         address proxy = getContractAddress("PeerRating");
         console.log("Proxy address:", proxy);
 
-        startBroadcast();
+        vm.startBroadcast();
         PeerRating newImplementation = new PeerRating();
         console.log("New implementation:", address(newImplementation));
         PeerRating(proxy).upgradeToAndCall(address(newImplementation), "");

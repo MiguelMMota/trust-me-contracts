@@ -27,7 +27,7 @@ contract DeployUser is Script, DeploymentConfig {
         address topicRegistry = getContractAddress("TopicRegistry");
         console.log("Using TopicRegistry at:", topicRegistry);
 
-        startBroadcast();
+        vm.startBroadcast();
 
         // 1. Deploy implementation
         User implementation = new User();
@@ -58,7 +58,7 @@ contract DeployUser is Script, DeploymentConfig {
     function fillData(address proxy) public {
         console.log("\n=== Creating Test Users ===");
 
-        startBroadcast();
+        vm.startBroadcast();
 
         User userContract = User(proxy);
 
@@ -77,7 +77,7 @@ contract DeployUser is Script, DeploymentConfig {
             userContract.registerUser();
             vm.stopPrank();
             console.log("User", i + 1, "registered:", testUsers[i]);
-            startBroadcast();
+            vm.startBroadcast();
         }
 
         vm.stopBroadcast();

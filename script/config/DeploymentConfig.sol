@@ -39,26 +39,7 @@ abstract contract DeploymentConfig is Script {
      *      When using DEPLOYER_PRIVATE_KEY env var, derive from private key
      */
     function getDeployer() internal view returns (address) {
-        // Try to load from environment variable (for CI/CD)
-        try vm.envUint("DEPLOYER_PRIVATE_KEY") returns (uint256 privateKey) {
-            return vm.addr(privateKey);
-        } catch {
-            // If DEPLOYER_PRIVATE_KEY not found, use msg.sender (for --account usage)
-            return msg.sender;
-        }
-    }
-
-    /**
-     * @notice Start broadcast - works with both cast wallet and env var
-     * @dev When using --account flag, broadcast as msg.sender
-     *      When using DEPLOYER_PRIVATE_KEY env var, broadcast with private key
-     */
-    function startBroadcast() internal {
-        try vm.envUint("DEPLOYER_PRIVATE_KEY") returns (uint256 privateKey) {
-            vm.startBroadcast(privateKey);
-        } catch {
-            vm.startBroadcast();
-        }
+        return msg.sender;
     }
 
     /**

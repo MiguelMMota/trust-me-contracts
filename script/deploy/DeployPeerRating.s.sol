@@ -33,7 +33,7 @@ contract DeployPeerRating is Script, DeploymentConfig {
         console.log("Using TopicRegistry at:", topicRegistry);
         console.log("Using User at:", user);
 
-        startBroadcast();
+        vm.startBroadcast();
 
         // 1. Deploy implementation
         PeerRating implementation = new PeerRating();
@@ -65,7 +65,7 @@ contract DeployPeerRating is Script, DeploymentConfig {
     function fillData(address proxy) public {
         console.log("\n=== Creating Peer Ratings ===");
 
-        startBroadcast();
+        vm.startBroadcast();
 
         PeerRating peerRatingContract = PeerRating(proxy);
 

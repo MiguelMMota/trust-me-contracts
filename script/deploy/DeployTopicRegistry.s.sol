@@ -19,7 +19,7 @@ contract DeployTopicRegistry is Script, DeploymentConfig {
         console.log("Deployer:", deployer);
         console.log("Network:", getNetworkName());
 
-        startBroadcast();
+        vm.startBroadcast();
 
         // 1. Deploy implementation
         TopicRegistry implementation = new TopicRegistry();
@@ -49,25 +49,27 @@ contract DeployTopicRegistry is Script, DeploymentConfig {
     function fillData(address proxy) public {
         console.log("\n=== Creating Initial Topic Hierarchy ===");
 
-        startBroadcast();
+        vm.startBroadcast();
+
+        TopicRegistry topicRegistry = TopicRegistry(proxy);
 
         // Create initial topic hierarchy
-        uint32 mathId = TopicRegistry(proxy).createTopic("Mathematics", 0);
-        uint32 algebraId = TopicRegistry(proxy).createTopic("Algebra", mathId);
-        uint32 calculusId = TopicRegistry(proxy).createTopic("Calculus", mathId);
+        uint32 mathId = topicRegistry.createTopic("Mathematics", 0);
+        uint32 algebraId = topicRegistry.createTopic("Algebra", mathId);
+        uint32 calculusId = topicRegistry.createTopic("Calculus", mathId);
 
-        uint32 historyId = TopicRegistry(proxy).createTopic("History", 0);
-        uint32 worldHistoryId = TopicRegistry(proxy).createTopic("World History", historyId);
+        uint32 historyId = topicRegistry.createTopic("History", 0);
+        uint32 worldHistoryId = topicRegistry.createTopic("World History", historyId);
 
-        uint32 languagesId = TopicRegistry(proxy).createTopic("Languages", 0);
-        uint32 englishId = TopicRegistry(proxy).createTopic("English", languagesId);
-        uint32 spanishId = TopicRegistry(proxy).createTopic("Spanish", languagesId);
+        uint32 languagesId = topicRegistry.createTopic("Languages", 0);
+        uint32 englishId = topicRegistry.createTopic("English", languagesId);
+        uint32 spanishId = topicRegistry.createTopic("Spanish", languagesId);
 
-        uint32 softwareId = TopicRegistry(proxy).createTopic("Software Engineering", 0);
-        uint32 frontendId = TopicRegistry(proxy).createTopic("Frontend Development", softwareId);
-        uint32 backendId = TopicRegistry(proxy).createTopic("Backend Development", softwareId);
-        uint32 pythonId = TopicRegistry(proxy).createTopic("Python", backendId);
-        uint32 blockchainId = TopicRegistry(proxy).createTopic("Blockchain Development", softwareId);
+        uint32 softwareId = topicRegistry.createTopic("Software Engineering", 0);
+        uint32 frontendId = topicRegistry.createTopic("Frontend Development", softwareId);
+        uint32 backendId = topicRegistry.createTopic("Backend Development", softwareId);
+        uint32 pythonId = topicRegistry.createTopic("Python", backendId);
+        uint32 blockchainId = topicRegistry.createTopic("Blockchain Development", softwareId);
 
         console.log("Created 13 topics across 4 root categories");
 

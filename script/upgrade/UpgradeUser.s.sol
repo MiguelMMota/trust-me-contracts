@@ -24,7 +24,7 @@ contract UpgradeUser is Script, DeploymentConfig {
         address proxy = getContractAddress("User");
         console.log("Proxy address:", proxy);
 
-        startBroadcast();
+        vm.startBroadcast();
 
         User newImplementation = new User();
         console.log("New implementation deployed at:", address(newImplementation));
