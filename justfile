@@ -24,6 +24,9 @@ deploy-local:
 # Deploy all contracts to Sepolia testnet
 deploy-sepolia:
     forge script script/Deploy.s.sol --rpc-url $SEPOLIA_RPC_URL --account sepoliaKey --password-file .password --broadcast --verify
+    @echo "\nDeployment complete! Checking proxy verification status..."
+    @sleep 5
+    @just verify-proxies sepolia
 
 # ===========================================
 # Individual Contract Deployments
@@ -77,3 +80,11 @@ size:
 
 coverage:
     forge coverage --no-match-coverage script
+
+# ===========================================
+# Verification
+# ===========================================
+
+# Verify all proxy contracts on Etherscan
+verify-proxies NETWORK:
+    ./script/verify-proxies.sh {{NETWORK}}
