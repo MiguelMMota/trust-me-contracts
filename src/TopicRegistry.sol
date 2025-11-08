@@ -89,9 +89,7 @@ contract TopicRegistry is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
         topicNameToId[name] = newTopicId;
 
-        if (parentId != 0) {
-            childTopics[parentId].push(newTopicId);
-        }
+        childTopics[parentId].push(newTopicId);
 
         emit TopicCreated(newTopicId, name, parentId);
         return newTopicId;
