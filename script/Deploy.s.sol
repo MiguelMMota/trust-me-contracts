@@ -58,6 +58,8 @@ contract DeployScript is Script, DeploymentConfig {
         ReputationEngine(reputationEngineContract).setPeerRatingContract(peerRatingContract);
         console.log("ReputationEngine.setPeerRatingContract()");
 
+        vm.sleep(2000);
+
         console.log("=== Cross-Contract References Complete ===\n");
 
         vm.stopBroadcast();
@@ -431,6 +433,8 @@ contract DeployScript is Script, DeploymentConfig {
 
                 ratingsCreated++;
             }
+
+            vm.sleep(2000);
         }
 
         vm.stopPrank();
@@ -462,6 +466,8 @@ contract DeployScript is Script, DeploymentConfig {
         uint32 backendId = topicRegistry.createTopic("Backend Development", softwareId);
         uint32 pythonId = topicRegistry.createTopic("Python", backendId);
         uint32 blockchainId = topicRegistry.createTopic("Blockchain Development", softwareId);
+
+        vm.sleep(2000);
 
         console.log("Created 13 topics across 4 root categories");
 
@@ -511,6 +517,8 @@ contract DeployScript is Script, DeploymentConfig {
 
             vm.startBroadcast(deployer);
         }
+
+        vm.sleep(2000);
 
         vm.stopBroadcast();
 
