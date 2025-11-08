@@ -484,6 +484,79 @@ contract PeerRatingTest is Test {
         assertFalse(peerRating.ratingExistsAtTimestamp(bob, mathTopicId, alice, timestamp + 1));
     }
 
+    function testGetRatingsByUser() public {
+        uint64 t0 = uint64(block.timestamp);
+
+        // Alice rates Bob on Math
+        vm.prank(alice);
+        peerRating.rateUser(bob, mathTopicId, 800);
+
+        // Alice rates Bob on Science
+        vm.prank(alice);
+        peerRating.rateUser(bob, scienceTopicId, 700);
+
+        // Alice rates Charlie on Math
+        vm.prank(alice);
+        peerRating.rateUser(charlie, mathTopicId, 600);
+
+        // Get all ratings made by Alice
+        PeerRating.Rating[] memory aliceRatings = peerRating.getRatingsByUser(alice);
+
+        // Alice should have made 3 ratings
+        assertEq(aliceRatings.length, 3);
+
+        // Verify first rating (Bob, Math, 800)
+        assertEq(aliceRatings[0].rater, alice);
+        assertEq(aliceRatings[0].ratee, bob);
+        assertEq(aliceRatings[0].topicId, mathTopicId);
+        assertEq(aliceRatings[0].score, 800);
+        assertEq(aliceRatings[0].timestamp, t0);
+        assertTrue(aliceRatings[0].exists);
+
+        // Verify second rating (Bob, Science, 700)
+        assertEq(aliceRatings[1].rater, alice);
+        assertEq(aliceRatings[1].ratee, bob);
+        assertEq(aliceRatings[1].topicId, scienceTopicId);
+        assertEq(aliceRatings[1].score, 700);
+        assertTrue(aliceRatings[1].exists);
+
+        // Verify third rating (Charlie, Math, 600)
+        assertEq(aliceRatings[2].rater, alice);
+        assertEq(aliceRatings[2].ratee, charlie);
+        assertEq(aliceRatings[2].topicId, mathTopicId);
+        assertEq(aliceRatings[2].score, 600);
+        assertTrue(aliceRatings[2].exists);
+
+        // Verify Bob has made no ratings
+        PeerRating.Rating[] memory bobRatings = peerRating.getRatingsByUser(bob);
+        assertEq(bobRatings.length, 0);
+    }
+
+    function testGetRatingsByUserIncludesUpdates() public {
+        // Alice rates Bob on Math
+        vm.prank(alice);
+        peerRating.rateUser(bob, mathTopicId, 500);
+
+        // Check Alice has 1 rating
+        PeerRating.Rating[] memory ratings1 = peerRating.getRatingsByUser(alice);
+        assertEq(ratings1.length, 1);
+        assertEq(ratings1[0].score, 500);
+
+        // Wait for cooldown and update rating
+        vm.warp(block.timestamp + 183 days);
+        uint64 updateTime = uint64(block.timestamp);
+
+        vm.prank(alice);
+        peerRating.rateUser(bob, mathTopicId, 900);
+
+        // Check Alice now has 2 rating entries (original + update)
+        PeerRating.Rating[] memory ratings2 = peerRating.getRatingsByUser(alice);
+        assertEq(ratings2.length, 2);
+        assertEq(ratings2[0].score, 500); // Original rating
+        assertEq(ratings2[1].score, 900); // Updated rating
+        assertEq(ratings2[1].timestamp, updateTime);
+    }
+
     /*///////////////////////////
      COMPLEX SCENARIO TESTS
     ///////////////////////////*/

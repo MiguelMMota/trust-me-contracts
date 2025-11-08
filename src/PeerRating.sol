@@ -68,6 +68,9 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     // user => topics they've been rated on
     mapping(address => uint32[]) public userRatedTopics;
 
+    // rater => array of all ratings they've made
+    mapping(address => Rating[]) public ratingsMadeByUser;
+
     TopicRegistry public topicRegistry;
     User public userContract;
     address public reputationEngine; // Will be set after ReputationEngine deployment
@@ -186,6 +189,11 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         rating.score = score;
         rating.timestamp = timestamp;
         rating.exists = true;
+
+        // Track this rating in the rater's list of ratings made
+        ratingsMadeByUser[msg.sender].push(
+            Rating({rater: msg.sender, ratee: ratee, topicId: topicId, score: score, timestamp: timestamp, exists: true})
+        );
 
         // Track this timestamp
         timestamps.push(timestamp);
@@ -360,6 +368,15 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
      */
     function getUserTopicRating(address user, uint32 topicId) external view returns (UserTopicRatings memory) {
         return userTopicRatings[user][topicId];
+    }
+
+    /**
+     * @notice Get all ratings made by a user (where they are the rater)
+     * @param user User address (rater)
+     * @return Array of Rating structs representing all ratings this user has given
+     */
+    function getRatingsByUser(address user) external view returns (Rating[] memory) {
+        return ratingsMadeByUser[user];
     }
 
     /**
