@@ -223,6 +223,75 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     }
 
     /**
+     * @notice Admin function to create test ratings on behalf of users (bypasses cooldown)
+     * @dev Only callable by owner, intended for initial data population during deployment
+     * @param rater Address of the user giving the rating
+     * @param ratee Address of user being rated
+     * @param topicId Topic ID
+     * @param score Rating score (0-1000)
+     */
+    function adminRateUser(address rater, address ratee, uint32 topicId, uint16 score)
+        external
+        onlyOwner
+        onlyRegistered(rater)
+        onlyRegistered(ratee)
+    {
+        // Validate inputs
+        if (rater == ratee) revert SelfRatingNotAllowed();
+        if (score > MAX_RATING) revert InvalidRatingValue();
+
+        // Verify topic exists
+        TopicRegistry.Topic memory topic = topicRegistry.getTopic(topicId);
+        if (!topic.isActive) revert InvalidTopicId();
+
+        uint64 timestamp = uint64(block.timestamp);
+
+        // Check if this is a first rating from this rater
+        uint64[] storage timestamps = ratingTimestamps[ratee][topicId][rater];
+        bool isFirstRatingFromRater = timestamps.length == 0;
+
+        // Create new rating entry at this timestamp
+        Rating storage rating = ratings[ratee][topicId][rater][timestamp];
+        rating.rater = rater;
+        rating.ratee = ratee;
+        rating.topicId = topicId;
+        rating.score = score;
+        rating.timestamp = timestamp;
+        rating.exists = true;
+
+        // Track this rating in the rater's list of ratings made
+        ratingsMadeByUser[rater].push(
+            Rating({rater: rater, ratee: ratee, topicId: topicId, score: score, timestamp: timestamp, exists: true})
+        );
+
+        // Track this timestamp
+        timestamps.push(timestamp);
+
+        // Track this rater if first time rating this user on this topic
+        if (isFirstRatingFromRater) {
+            topicRaters[ratee][topicId].push(rater);
+
+            // Track this topic if first rating ever received
+            if (userTopicRatings[ratee][topicId].totalRatings == 0) {
+                userRatedTopics[ratee].push(topicId);
+            }
+        }
+
+        // Emit appropriate event
+        if (isFirstRatingFromRater) {
+            emit RatingSubmitted(rater, ratee, topicId, score, timestamp);
+        } else {
+            // This is an amendment - get the previous rating
+            uint64 previousTimestamp = timestamps[timestamps.length - 2];
+            uint16 oldScore = ratings[ratee][topicId][rater][previousTimestamp].score;
+            emit RatingUpdated(rater, ratee, topicId, oldScore, score, timestamp);
+        }
+
+        // Update aggregate ratings (at current time)
+        _updateAggregateRating(ratee, topicId, block.timestamp);
+    }
+
+    /**
      * @notice Internal function to recalculate aggregate rating for a user on a topic at a specific time
      * @param user User address
      * @param topicId Topic ID

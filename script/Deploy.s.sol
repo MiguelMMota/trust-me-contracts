@@ -384,6 +384,8 @@ contract DeployScript is Script, DeploymentConfig {
             uint32(13) // Blockchain Development (skipping Python #12 for 90% coverage)
         ];
 
+        vm.startBroadcast(deployer);
+
         // Each user rates the other 3 users on 90% of topics (12 topics)
         uint256 totalRatings = 0;
 
@@ -399,6 +401,8 @@ contract DeployScript is Script, DeploymentConfig {
 
         i++;
         totalRatings += _createRatingsForUser(peerRatingContract, testUsers, testUsers[i], i, topicIds);
+
+        vm.stopBroadcast();
 
         console.log("=== Peer Ratings Complete ===");
         console.log("Total ratings created:", totalRatings);
@@ -416,8 +420,6 @@ contract DeployScript is Script, DeploymentConfig {
     ) private returns (uint256 ratingsCreated) {
         ratingsCreated = 0;
 
-        vm.startPrank(rater);
-
         for (uint256 rateeIdx = 0; rateeIdx < testUsers.length; rateeIdx++) {
             // Skip self-rating
             if (raterIdx == rateeIdx) continue;
@@ -429,15 +431,13 @@ contract DeployScript is Script, DeploymentConfig {
                 // Generate pseudo-random scores between 300-900 for variety
                 uint16 score = uint16(300 + ((raterIdx * 100 + rateeIdx * 50 + topicIdx * 30) % 600));
 
-                peerRatingContract.rateUser(ratee, topicIds[topicIdx], score);
+                peerRatingContract.adminRateUser(rater, ratee, topicIds[topicIdx], score);
 
                 ratingsCreated++;
             }
 
             vm.sleep(2000);
         }
-
-        vm.stopPrank();
 
         console.log("User", raterIdx + 1, "completed ratings");
     }
