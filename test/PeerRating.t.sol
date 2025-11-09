@@ -708,4 +708,222 @@ contract PeerRatingTest is Test {
         uint64[] memory timestamps = peerRating.getRatingTimestamps(bob, mathTopicId, alice);
         assertEq(timestamps.length, 0);
     }
+
+    /*///////////////////////////
+        ADMIN RATING TESTS
+    ///////////////////////////*/
+
+    function testAdminRateUser() public {
+        vm.prank(admin);
+        peerRating.adminRateUser(alice, bob, mathTopicId, 750);
+
+        PeerRating.Rating memory rating = peerRating.getRating(bob, mathTopicId, alice);
+        assertEq(rating.rater, alice);
+        assertEq(rating.ratee, bob);
+        assertEq(rating.topicId, mathTopicId);
+        assertEq(rating.score, 750);
+        assertTrue(rating.exists);
+    }
+
+    function testAdminRateUserOnlyOwner() public {
+        vm.prank(alice);
+        vm.expectRevert();
+        peerRating.adminRateUser(alice, bob, mathTopicId, 750);
+    }
+
+    function testAdminRateUserBypassesCooldown() public {
+        vm.startPrank(admin);
+
+        // First rating
+        peerRating.adminRateUser(alice, bob, mathTopicId, 500);
+
+        // Second rating immediately (no cooldown wait)
+        peerRating.adminRateUser(alice, bob, mathTopicId, 900);
+
+        vm.stopPrank();
+
+        // Should have 2 timestamps
+        uint64[] memory timestamps = peerRating.getRatingTimestamps(bob, mathTopicId, alice);
+        assertEq(timestamps.length, 2);
+
+        // Latest rating should be 900
+        PeerRating.Rating memory rating = peerRating.getRating(bob, mathTopicId, alice);
+        assertEq(rating.score, 900);
+    }
+
+    function testAdminRateUserMultipleUsers() public {
+        vm.startPrank(admin);
+
+        // Admin creates ratings on behalf of multiple users
+        peerRating.adminRateUser(alice, bob, mathTopicId, 800);
+        peerRating.adminRateUser(charlie, bob, mathTopicId, 600);
+        peerRating.adminRateUser(dave, bob, mathTopicId, 1000);
+
+        vm.stopPrank();
+
+        // Check aggregate rating
+        PeerRating.UserTopicRatings memory ratings = peerRating.getUserTopicRating(bob, mathTopicId);
+        assertEq(ratings.averageScore, 800); // (800 + 600 + 1000) / 3
+        assertEq(ratings.totalRatings, 3);
+    }
+
+    function testAdminRateUserEmitsEvent() public {
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit PeerRating.RatingSubmitted(alice, bob, mathTopicId, 750, uint64(block.timestamp));
+        peerRating.adminRateUser(alice, bob, mathTopicId, 750);
+    }
+
+    function testAdminRateUserEmitsUpdateEvent() public {
+        vm.startPrank(admin);
+
+        // First rating
+        peerRating.adminRateUser(alice, bob, mathTopicId, 500);
+
+        vm.stopPrank();
+
+        // Warp time slightly to create a different timestamp
+        vm.warp(block.timestamp + 1);
+
+        // Update rating (should emit RatingUpdated event)
+        vm.prank(admin);
+        vm.expectEmit(true, true, true, true);
+        emit PeerRating.RatingUpdated(alice, bob, mathTopicId, 500, 900, uint64(block.timestamp));
+        peerRating.adminRateUser(alice, bob, mathTopicId, 900);
+    }
+
+    function testAdminRateUserSelfRatingNotAllowed() public {
+        vm.prank(admin);
+        vm.expectRevert(PeerRating.SelfRatingNotAllowed.selector);
+        peerRating.adminRateUser(alice, alice, mathTopicId, 800);
+    }
+
+    function testAdminRateUserUnregisteredRater() public {
+        vm.prank(admin);
+        vm.expectRevert(PeerRating.UserNotRegistered.selector);
+        peerRating.adminRateUser(unregisteredUser, bob, mathTopicId, 800);
+    }
+
+    function testAdminRateUserUnregisteredRatee() public {
+        vm.prank(admin);
+        vm.expectRevert(PeerRating.UserNotRegistered.selector);
+        peerRating.adminRateUser(alice, unregisteredUser, mathTopicId, 800);
+    }
+
+    function testAdminRateUserInvalidScore() public {
+        vm.prank(admin);
+        vm.expectRevert(PeerRating.InvalidRatingValue.selector);
+        peerRating.adminRateUser(alice, bob, mathTopicId, 1001);
+    }
+
+    function testAdminRateUserInactiveTopic() public {
+        vm.prank(admin);
+        vm.expectRevert(PeerRating.InvalidTopicId.selector);
+        peerRating.adminRateUser(alice, bob, inactiveTopicId, 800);
+    }
+
+    function testAdminRateUserMinScore() public {
+        vm.prank(admin);
+        peerRating.adminRateUser(alice, bob, mathTopicId, 0);
+
+        PeerRating.Rating memory rating = peerRating.getRating(bob, mathTopicId, alice);
+        assertEq(rating.score, 0);
+    }
+
+    function testAdminRateUserMaxScore() public {
+        vm.prank(admin);
+        peerRating.adminRateUser(alice, bob, mathTopicId, 1000);
+
+        PeerRating.Rating memory rating = peerRating.getRating(bob, mathTopicId, alice);
+        assertEq(rating.score, 1000);
+    }
+
+    function testAdminRateUserUpdatesAggregateRating() public {
+        vm.prank(admin);
+        peerRating.adminRateUser(alice, bob, mathTopicId, 800);
+
+        PeerRating.UserTopicRatings memory ratings = peerRating.getUserTopicRating(bob, mathTopicId);
+        assertEq(ratings.averageScore, 800);
+        assertEq(ratings.totalRatings, 1);
+    }
+
+    function testAdminRateUserTracksInRatingsByUser() public {
+        vm.startPrank(admin);
+
+        peerRating.adminRateUser(alice, bob, mathTopicId, 800);
+        peerRating.adminRateUser(alice, charlie, mathTopicId, 600);
+
+        vm.stopPrank();
+
+        // Check that ratings are tracked for Alice
+        PeerRating.Rating[] memory aliceRatings = peerRating.getRatingsByUser(alice);
+        assertEq(aliceRatings.length, 2);
+        assertEq(aliceRatings[0].ratee, bob);
+        assertEq(aliceRatings[0].score, 800);
+        assertEq(aliceRatings[1].ratee, charlie);
+        assertEq(aliceRatings[1].score, 600);
+    }
+
+    function testAdminRateUserMultipleTopics() public {
+        vm.startPrank(admin);
+
+        peerRating.adminRateUser(alice, bob, mathTopicId, 800);
+        peerRating.adminRateUser(alice, bob, scienceTopicId, 700);
+
+        vm.stopPrank();
+
+        // Check topics Bob has been rated on
+        uint32[] memory topics = peerRating.getUserRatedTopics(bob);
+        assertEq(topics.length, 2);
+        assertEq(topics[0], mathTopicId);
+        assertEq(topics[1], scienceTopicId);
+    }
+
+    function testAdminRateUserDoesNotRequireCooldown() public {
+        vm.startPrank(admin);
+
+        // Create 5 ratings immediately without any time passing
+        peerRating.adminRateUser(alice, bob, mathTopicId, 100);
+        peerRating.adminRateUser(alice, bob, mathTopicId, 200);
+        peerRating.adminRateUser(alice, bob, mathTopicId, 300);
+        peerRating.adminRateUser(alice, bob, mathTopicId, 400);
+        peerRating.adminRateUser(alice, bob, mathTopicId, 500);
+
+        vm.stopPrank();
+
+        // Should have 5 timestamps
+        uint64[] memory timestamps = peerRating.getRatingTimestamps(bob, mathTopicId, alice);
+        assertEq(timestamps.length, 5);
+
+        // Latest rating should be 500
+        PeerRating.Rating memory rating = peerRating.getRating(bob, mathTopicId, alice);
+        assertEq(rating.score, 500);
+    }
+
+    function testAdminAndRegularRatingsMix() public {
+        // Admin creates initial rating
+        vm.prank(admin);
+        peerRating.adminRateUser(alice, bob, mathTopicId, 500);
+
+        // Regular rating update should still require cooldown
+        vm.warp(block.timestamp + 100 days); // Not enough time
+        vm.prank(alice);
+        vm.expectRevert();
+        peerRating.rateUser(bob, mathTopicId, 900);
+
+        // After sufficient cooldown, regular update should work
+        vm.warp(block.timestamp + 83 days); // Total: 183 days
+        vm.prank(alice);
+        peerRating.rateUser(bob, mathTopicId, 900);
+
+        PeerRating.Rating memory rating = peerRating.getRating(bob, mathTopicId, alice);
+        assertEq(rating.score, 900);
+    }
+
+    function testAdminRateUserEmitsAggregateRatingUpdatedEvent() public {
+        vm.prank(admin);
+        vm.expectEmit(true, true, false, true);
+        emit PeerRating.AggregateRatingUpdated(bob, mathTopicId, 750, 1);
+        peerRating.adminRateUser(alice, bob, mathTopicId, 750);
+    }
 }
