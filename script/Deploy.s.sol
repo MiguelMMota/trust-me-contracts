@@ -429,7 +429,7 @@ contract DeployScript is Script, DeploymentConfig {
             // Rate on all but the last topic
             for (uint256 topicIdx = 0; topicIdx < topicIds.length - 1; topicIdx++) {
                 // Generate pseudo-random scores for variety
-                uint16 score = uint16(345 + ((raterIdx * 678 + rateeIdx * 901 + topicIdx * 234) % (1001))); // TODO: Replace 1001 with PeerRating.MAX_RATING() + 1
+                uint16 score = uint16((raterIdx * 678 + rateeIdx * 901 + topicIdx * 234) % 1001); // TODO: Replace 1001 with PeerRating.MAX_RATING() + 1
 
                 peerRatingContract.adminRateUser(rater, ratee, topicIds[topicIdx], score);
 
