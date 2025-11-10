@@ -511,19 +511,14 @@ contract DeployScript is Script, DeploymentConfig {
         for (uint256 i = 0; i < testUsers.length; i++) {
             // Use vm.prank to register each user from their own address
 
-            vm.stopBroadcast();
-            vm.startPrank(testUsers[i]);
-            userContract.registerUser(testUserNames[i]);
-            vm.stopPrank();
+            userContract.adminRegisterUser(testUsers[i], testUserNames[i]);
             console.log("User registered:", testUsers[i]);
             console.log("Name:", testUserNames[i]);
-
-            vm.startBroadcast(deployer);
         }
 
-        vm.sleep(2000);
-
         vm.stopBroadcast();
+
+        vm.sleep(2000);
 
         console.log("=== User Registration Complete ===");
         console.log("4 users have been registered");

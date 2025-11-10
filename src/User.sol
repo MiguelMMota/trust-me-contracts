@@ -123,20 +123,19 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     /**
      * @notice Register a new user
+     * @param userAddress The address of the user
+     * @param name The name of the user
+     */
+    function adminRegisterUser(address userAddress, string calldata name) external onlyOwner {
+        _registerUser(userAddress, name);
+    }
+
+    /**
+     * @notice Register a new user
      * @param name The name of the user
      */
     function registerUser(string calldata name) external {
-        if (userProfiles[msg.sender].isRegistered) revert UserAlreadyRegistered();
-
-        userProfiles[msg.sender] = UserProfile({
-            userAddress: msg.sender,
-            isRegistered: true,
-            registrationTime: uint64(block.timestamp),
-            totalTopicsEngaged: 0,
-            name: name
-        });
-
-        emit UserRegistered(msg.sender, uint64(block.timestamp));
+        _registerUser(msg.sender, name);
     }
 
     /**
@@ -260,4 +259,23 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
      * @dev Only owner can upgrade the contract
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
+
+    /**
+     * @notice Register a new user
+     * @param userAddress The address of the user
+     * @param name The name of the user
+     */
+    function _registerUser(address userAddress, string calldata name) private {
+        if (userProfiles[userAddress].isRegistered) revert UserAlreadyRegistered();
+
+        userProfiles[userAddress] = UserProfile({
+            userAddress: userAddress,
+            isRegistered: true,
+            registrationTime: uint64(block.timestamp),
+            totalTopicsEngaged: 0,
+            name: name
+        });
+
+        emit UserRegistered(userAddress, uint64(block.timestamp));
+    }
 }
