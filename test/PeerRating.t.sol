@@ -57,16 +57,16 @@ contract PeerRatingTest is Test {
 
         // Register users
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         vm.prank(bob);
-        userContract.registerUser();
+        userContract.registerUser("Bob");
 
         vm.prank(charlie);
-        userContract.registerUser();
+        userContract.registerUser("Charlie");
 
         vm.prank(dave);
-        userContract.registerUser();
+        userContract.registerUser("Dave");
     }
 
     /*///////////////////////////

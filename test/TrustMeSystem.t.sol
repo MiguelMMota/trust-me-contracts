@@ -83,11 +83,11 @@ contract TrustMeSystemTest is Test {
     function testMultipleChallengesScoring() public {
         // Setup
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         // Register admin once before loop
         vm.prank(admin);
-        userContract.registerUser();
+        userContract.registerUser("Admin");
 
         // Create 5 challenges
         uint64[] memory challengeIds = new uint64[](5);
@@ -131,13 +131,13 @@ contract TrustMeSystemTest is Test {
     function testWeightedVoting() public {
         // Setup: Register users
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         vm.prank(bob);
-        userContract.registerUser();
+        userContract.registerUser("Bob");
 
         vm.prank(admin);
-        userContract.registerUser();
+        userContract.registerUser("Admin");
 
         // Give Alice high expertise in math (answer 10 challenges correctly)
         for (uint256 i = 0; i < 10; i++) {
@@ -184,10 +184,10 @@ contract TrustMeSystemTest is Test {
 
     function testAccuracyCalculation() public {
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         vm.prank(admin);
-        userContract.registerUser();
+        userContract.registerUser("Admin");
 
         // Answer 7 out of 10 correctly
         for (uint256 i = 0; i < 10; i++) {

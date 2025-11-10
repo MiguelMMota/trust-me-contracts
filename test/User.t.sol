@@ -40,17 +40,18 @@ contract UserTest is Test {
 
     function testUserRegistration() public {
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         assertTrue(userContract.isRegistered(alice));
         User.UserProfile memory profile = userContract.getUserProfile(alice);
         assertEq(profile.userAddress, alice);
         assertEq(profile.totalTopicsEngaged, 0);
+        assertEq(profile.name, "Alice");
     }
 
     function testAccuracyWithNoChallenges() public {
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         // With no challenges, accuracy should be 0
         uint16 accuracy = userContract.getAccuracy(alice, mathTopicId);

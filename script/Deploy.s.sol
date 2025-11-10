@@ -506,14 +506,17 @@ contract DeployScript is Script, DeploymentConfig {
             0xCACCbe50c1D788031d774dd886DA8F5Dc225ee06
         ];
 
+        string[4] memory testUserNames = ["Alice", "Bob", "Charlie", "David"];
+
         for (uint256 i = 0; i < testUsers.length; i++) {
             // Use vm.prank to register each user from their own address
 
             vm.stopBroadcast();
             vm.startPrank(testUsers[i]);
-            userContract.registerUser();
+            userContract.registerUser(testUserNames[i]);
             vm.stopPrank();
-            console.log("User", i + 1, "registered:", testUsers[i]);
+            console.log("User registered:", testUsers[i]);
+            console.log("Name:", testUserNames[i]);
 
             vm.startBroadcast(deployer);
         }

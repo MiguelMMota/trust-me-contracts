@@ -66,7 +66,7 @@ contract ReputationEngineTest is Test {
 
     function testReputationScoreCalculation() public {
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         // Simulate expertise data
         uint16 score = reputationEngine.calculateExpertiseScore(alice, mathTopicId);
@@ -79,12 +79,12 @@ contract ReputationEngineTest is Test {
 
     function testTimeDecay() public {
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         // Create and answer a challenge
         bytes32 answerHash = keccak256(abi.encodePacked("answer"));
         vm.prank(admin);
-        userContract.registerUser();
+        userContract.registerUser("Admin");
         vm.prank(admin);
         uint64 challengeId = challengeContract.createChallenge(
             mathTopicId, Challenge.DifficultyLevel.Easy, keccak256("Question"), answerHash

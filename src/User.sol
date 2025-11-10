@@ -38,6 +38,7 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         bool isRegistered;
         uint64 registrationTime;
         uint32 totalTopicsEngaged;
+        string name;
     }
 
     /*///////////////////////////
@@ -122,15 +123,17 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     /**
      * @notice Register a new user
+     * @param name The name of the user
      */
-    function registerUser() external {
+    function registerUser(string calldata name) external {
         if (userProfiles[msg.sender].isRegistered) revert UserAlreadyRegistered();
 
         userProfiles[msg.sender] = UserProfile({
             userAddress: msg.sender,
             isRegistered: true,
             registrationTime: uint64(block.timestamp),
-            totalTopicsEngaged: 0
+            totalTopicsEngaged: 0,
+            name: name
         });
 
         emit UserRegistered(msg.sender, uint64(block.timestamp));

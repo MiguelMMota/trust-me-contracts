@@ -50,7 +50,7 @@ contract ChallengeTest is Test {
     function testChallengeCreation() public {
         // Register users
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         // Create challenge
         vm.prank(alice);
@@ -71,10 +71,10 @@ contract ChallengeTest is Test {
     function testChallengeAttemptCorrect() public {
         // Setup: Register users and create challenge
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         vm.prank(bob);
-        userContract.registerUser();
+        userContract.registerUser("Bob");
 
         vm.prank(alice);
         bytes32 answerHash = keccak256(abi.encodePacked("4"));
@@ -95,10 +95,10 @@ contract ChallengeTest is Test {
     function testChallengeAttemptIncorrect() public {
         // Setup
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         vm.prank(bob);
-        userContract.registerUser();
+        userContract.registerUser("Bob");
 
         vm.prank(alice);
         bytes32 correctAnswerHash = keccak256(abi.encodePacked("4"));

@@ -63,7 +63,7 @@ contract PollTest is Test {
     function testPollCreation() public {
         // Setup
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         // Create poll
         vm.prank(alice);
@@ -90,7 +90,7 @@ contract PollTest is Test {
 
     function testCannotVoteTwice() public {
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         vm.prank(alice);
         string[] memory options = new string[](2);
@@ -109,7 +109,7 @@ contract PollTest is Test {
 
     function testPollClosing() public {
         vm.prank(alice);
-        userContract.registerUser();
+        userContract.registerUser("Alice");
 
         vm.prank(alice);
         string[] memory options = new string[](2);
