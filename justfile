@@ -20,6 +20,8 @@ test-file FILE:
 # Deploy all contracts to local network (Anvil)
 deploy-local:
     forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --broadcast
+    @echo "\nUpdating dapp contract addresses..."
+    @./script/update-dapp-addresses.sh anvil
 
 # Deploy all contracts to Sepolia testnet
 deploy-sepolia:
@@ -27,35 +29,8 @@ deploy-sepolia:
     @echo "\nDeployment complete! Checking proxy verification status..."
     @sleep 5
     @just verify-proxies sepolia
-
-# ===========================================
-# Individual Contract Deployments
-# ===========================================
-
-# Deploy single contract to specified network (local or sepolia)
-# E.g.: just upgrade TopicRegistry sepolia deploys the TopicRegistry contract on the local network
-deploy CONTRACT NETWORK:
-    #!/usr/bin/env bash
-    if [ "{{NETWORK}}" = "local" ]; then
-        forge script script/deploy/Deploy{{CONTRACT}}.s.sol --rpc-url http://localhost:8545 --broadcast
-    elif [ "{{NETWORK}}" = "sepolia" ]; then
-        forge script script/deploy/Deploy{{CONTRACT}}.s.sol --rpc-url $SEPOLIA_RPC_URL --account sepoliaKey --password-file .password --broadcast --verify
-    else
-        echo "Error: Network must be 'local' or 'sepolia'"
-        exit 1
-    fi
-
-# Deploy single contract to specified network (local or sepolia), and fill some test data
-deploy-data CONTRACT NETWORK:
-    #!/usr/bin/env bash
-    if [ "{{NETWORK}}" = "local" ]; then
-        forge script script/deploy/Deploy{{CONTRACT}}.s.sol --rpc-url http://localhost:8545 --broadcast --sig "runWithData()"
-    elif [ "{{NETWORK}}" = "sepolia" ]; then
-        forge script script/deploy/Deploy{{CONTRACT}}.s.sol --rpc-url $SEPOLIA_RPC_URL --account sepoliaKey --password-file .password --broadcast --verify --sig "runWithData()"
-    else
-        echo "Error: Network must be 'local' or 'sepolia'"
-        exit 1
-    fi
+    @echo "\nUpdating dapp contract addresses..."
+    @./script/update-dapp-addresses.sh sepolia
 
 # ===========================================
 # Contract Upgrades
