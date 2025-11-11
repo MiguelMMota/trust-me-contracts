@@ -18,6 +18,22 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  * @dev Uses UUPS proxy pattern for upgradeable contracts
  */
 contract DeployScript is Script, DeploymentConfig {
+    /*//////////////////////////
+       STATE VARIABLES
+    //////////////////////////*/
+
+    // Sepolia testnet user addresses
+    address[4] private SEPOLIA_TEST_USERS = [
+        0xCDc986e956f889b6046F500657625E523f06D5F0,
+        0x13dbAD22Ae32aaa90F7E9173C1fA519c064E4d65,
+        0x28C02652dFc64202360E1A0B4f88FcedECB538a6,
+        0xCACCbe50c1D788031d774dd886DA8F5Dc225ee06
+    ];
+
+    /*//////////////////////////
+           FUNCTIONS
+    //////////////////////////*/
+
     function run() external {
         address deployer = getDeployer();
 
@@ -73,6 +89,54 @@ contract DeployScript is Script, DeploymentConfig {
         console.log("\nDeployment complete! Config saved to:");
         console.log(getDeploymentPath());
         console.log("===============================================\n");
+    }
+
+    /**
+     * @notice Returns Anvil's default test account addresses
+     * @dev These are the first 20 addresses generated from the mnemonic:
+     *      "test test test test test test test test test test test junk"
+     * @return addresses Array of 20 Anvil default addresses
+     */
+    function getAnvilAddresses() private pure returns (address[20] memory addresses) {
+        addresses[0] = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
+        addresses[1] = 0x70997970C51812dc3A010C7d01b50e0d17dc79C8;
+        addresses[2] = 0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC;
+        addresses[3] = 0x90F79bf6EB2c4f870365E785982E1f101E93b906;
+        addresses[4] = 0x15d34AAf54267DB7D7c367839AAf71A00a2C6A65;
+        addresses[5] = 0x9965507D1a55bcC2695C58ba16FB37d819B0A4dc;
+        addresses[6] = 0x976EA74026E726554dB657fA54763abd0C3a0aa9;
+        addresses[7] = 0x14dC79964da2C08b23698B3D3cc7Ca32193d9955;
+        addresses[8] = 0x23618e81E3f5cdF7f54C3d65f7FBc0aBf5B21E8f;
+        addresses[9] = 0xa0Ee7A142d267C1f36714E4a8F75612F20a79720;
+    }
+
+    /**
+     * @notice Returns test user addresses based on the deployment network
+     * @dev Returns Anvil addresses for local network, Sepolia addresses for testnet
+     * @param maxAddresses Maximum number of addresses to return
+     * @return testUsers Dynamic array of test user addresses (up to maxAddresses)
+     */
+    function getTestUserAddresses(uint256 maxAddresses) private view returns (address[] memory testUsers) {
+        string memory networkName = getNetworkName();
+
+        if (keccak256(bytes(networkName)) == keccak256(bytes("anvil"))) {
+            // Local network: use Anvil addresses
+            address[20] memory anvilAddresses = getAnvilAddresses();
+            uint256 count = maxAddresses > 20 ? 20 : maxAddresses;
+            testUsers = new address[](count);
+
+            for (uint256 i = 0; i < count; i++) {
+                testUsers[i] = anvilAddresses[i];
+            }
+        } else {
+            // Sepolia or other network: use configured addresses
+            uint256 count = maxAddresses > SEPOLIA_TEST_USERS.length ? SEPOLIA_TEST_USERS.length : maxAddresses;
+            testUsers = new address[](count);
+
+            for (uint256 i = 0; i < count; i++) {
+                testUsers[i] = SEPOLIA_TEST_USERS[i];
+            }
+        }
     }
 
     function deployChallenge(address deployer) private returns (address proxy) {
@@ -358,13 +422,8 @@ contract DeployScript is Script, DeploymentConfig {
 
         PeerRating peerRatingContract = PeerRating(proxy);
 
-        // Define the 4 test users
-        address[4] memory testUsers = [
-            0xCDc986e956f889b6046F500657625E523f06D5F0,
-            0x13dbAD22Ae32aaa90F7E9173C1fA519c064E4d65,
-            0x28C02652dFc64202360E1A0B4f88FcedECB538a6,
-            0xCACCbe50c1D788031d774dd886DA8F5Dc225ee06
-        ];
+        // Get test users based on network (Anvil or Sepolia)
+        address[] memory testUsers = getTestUserAddresses(4);
 
         // Topic IDs from TopicRegistry (based on DeployTopicRegistry.fillData)
         // We have 13 topics total. 90% coverage = 12 topics
@@ -413,7 +472,7 @@ contract DeployScript is Script, DeploymentConfig {
 
     function _createRatingsForUser(
         PeerRating peerRatingContract,
-        address[4] memory testUsers,
+        address[] memory testUsers,
         address rater,
         uint256 raterIdx,
         uint32[12] memory topicIds
@@ -498,19 +557,11 @@ contract DeployScript is Script, DeploymentConfig {
 
         User userContract = User(proxy);
 
-        // Register 4 test users
-        address[4] memory testUsers = [
-            0xCDc986e956f889b6046F500657625E523f06D5F0,
-            0x13dbAD22Ae32aaa90F7E9173C1fA519c064E4d65,
-            0x28C02652dFc64202360E1A0B4f88FcedECB538a6,
-            0xCACCbe50c1D788031d774dd886DA8F5Dc225ee06
-        ];
-
+        // Get test users based on network (Anvil or Sepolia)
+        address[] memory testUsers = getTestUserAddresses(4);
         string[4] memory testUserNames = ["Alice", "Bob", "Charlie", "David"];
 
         for (uint256 i = 0; i < testUsers.length; i++) {
-            // Use vm.prank to register each user from their own address
-
             userContract.adminRegisterUser(testUsers[i], testUserNames[i]);
             console.log("User registered:", testUsers[i]);
             console.log("Name:", testUserNames[i]);
