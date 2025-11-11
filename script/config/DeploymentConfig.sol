@@ -7,8 +7,6 @@ import {console} from "forge-std/console.sol";
 contract ServerConstants {
     address public constant FOUNDRY_DEFAULT_SENDER = 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38;
 
-    address public constant SEPOLIA_TEST_ACCOUNT = 0xCDc986e956f889b6046F500657625E523f06D5F0;
-
     uint256 public constant LOCAL_CHAIN_ID = 31337;
     uint256 public constant SEPOLIA_ETH_CHAIN_ID = 11_155_111;
 }
@@ -45,11 +43,12 @@ abstract contract DeploymentConfig is Script, ServerConstants {
     /**
      * @notice Get deployer address - works with both cast wallet and env var
      * @dev When using --account flag, msg.sender is the account
-     *      When using DEPLOYER_PRIVATE_KEY env var, derive from private key
+     *      When on Sepolia, reads from SEPOLIA_TEST_ACCOUNT env var
+     *      For local, uses Foundry's default sender
      */
     function getDeployer() internal view returns (address) {
         if (block.chainid == SEPOLIA_ETH_CHAIN_ID) {
-            return SEPOLIA_TEST_ACCOUNT;
+            return vm.envAddress("SEPOLIA_TEST_ACCOUNT");
         } else {
             return FOUNDRY_DEFAULT_SENDER;
         }

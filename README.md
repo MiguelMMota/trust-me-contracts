@@ -85,7 +85,7 @@ forge test --gas-report
 
 ### Deploy to Sepolia Testnet
 
-**Pre-requisite:** the deployment script 
+**Pre-requisite:** the deployment script relies on a deployer account address defined in the `SEPOLIA_TEST_ACCOUNT` environment variable. It's recommended to setup this account with `cast wallet`.
 
 1. Get Sepolia ETH from a faucet: https://sepoliafaucet.com/
 2. Set up your `.env` file with:
