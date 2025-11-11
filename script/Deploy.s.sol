@@ -19,18 +19,6 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
  */
 contract DeployScript is Script, DeploymentConfig {
     /*//////////////////////////
-       STATE VARIABLES
-    //////////////////////////*/
-
-    // Sepolia testnet user addresses
-    address[4] private SEPOLIA_TEST_USERS = [
-        0xCDc986e956f889b6046F500657625E523f06D5F0,
-        0x13dbAD22Ae32aaa90F7E9173C1fA519c064E4d65,
-        0x28C02652dFc64202360E1A0B4f88FcedECB538a6,
-        0xCACCbe50c1D788031d774dd886DA8F5Dc225ee06
-    ];
-
-    /*//////////////////////////
            FUNCTIONS
     //////////////////////////*/
 
@@ -92,6 +80,28 @@ contract DeployScript is Script, DeploymentConfig {
     }
 
     /**
+     * @notice Parses comma-separated addresses from environment variable
+     * @dev Reads SEPOLIA_TEST_USERS env variable and parses addresses
+     * @return addresses Dynamic array of parsed addresses
+     */
+    function parseSepoliaTestUsers() private view returns (address[] memory addresses) {
+        try vm.envString("SEPOLIA_TEST_USERS") returns (string memory addressesStr) {
+            // Split by comma
+            string[] memory addressStrings = vm.split(addressesStr, ",");
+            addresses = new address[](addressStrings.length);
+
+            for (uint256 i = 0; i < addressStrings.length; i++) {
+                // Trim whitespace and parse address
+                addresses[i] = vm.parseAddress(vm.trim(addressStrings[i]));
+            }
+        } catch {
+            // If env variable not set, return empty array
+            console.log("Warning: SEPOLIA_TEST_USERS env variable not set");
+            addresses = new address[](0);
+        }
+    }
+
+    /**
      * @notice Returns Anvil's default test account addresses
      * @dev These are the first 20 addresses generated from the mnemonic:
      *      "test test test test test test test test test test test junk"
@@ -129,12 +139,13 @@ contract DeployScript is Script, DeploymentConfig {
                 testUsers[i] = anvilAddresses[i];
             }
         } else {
-            // Sepolia or other network: use configured addresses
-            uint256 count = maxAddresses > SEPOLIA_TEST_USERS.length ? SEPOLIA_TEST_USERS.length : maxAddresses;
+            // Sepolia or other network: read from env variable
+            address[] memory sepoliaAddresses = parseSepoliaTestUsers();
+            uint256 count = maxAddresses > sepoliaAddresses.length ? sepoliaAddresses.length : maxAddresses;
             testUsers = new address[](count);
 
             for (uint256 i = 0; i < count; i++) {
-                testUsers[i] = SEPOLIA_TEST_USERS[i];
+                testUsers[i] = sepoliaAddresses[i];
             }
         }
     }
