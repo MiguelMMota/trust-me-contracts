@@ -170,11 +170,10 @@ contract DeployScript is Script, DeploymentConfig {
 
         vm.startBroadcast(deployer);
 
-        // 1. Deploy implementation
         Challenge implementation = new Challenge();
         console.log("Implementation deployed at:", address(implementation));
 
-        // 2. Encode initialize function call
+        // Encode initialize function call
         bytes memory initData = abi.encodeWithSelector(
             Challenge.initialize.selector,
             deployer, // initialOwner
@@ -182,14 +181,13 @@ contract DeployScript is Script, DeploymentConfig {
             user // _userContract
         );
 
-        // 3. Deploy proxy
         ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
         proxy = address(proxyContract);
         console.log("Proxy deployed at:", proxy);
 
         vm.stopBroadcast();
 
-        // 4. Save deployment
+        // Save deployment
         updateContractAddress("Challenge", proxy);
 
         console.log("=== Challenge Deployment Complete ===\n");
@@ -217,11 +215,10 @@ contract DeployScript is Script, DeploymentConfig {
 
         vm.startBroadcast(deployer);
 
-        // 1. Deploy implementation
         PeerRating implementation = new PeerRating();
         console.log("Implementation deployed at:", address(implementation));
 
-        // 2. Encode initialize function call
+        // Encode initialize function call
         bytes memory initData = abi.encodeWithSelector(
             PeerRating.initialize.selector,
             deployer, // initialOwner
@@ -229,14 +226,13 @@ contract DeployScript is Script, DeploymentConfig {
             user // _userContract
         );
 
-        // 3. Deploy proxy
         ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
         proxy = address(proxyContract);
         console.log("Proxy deployed at:", proxy);
 
         vm.stopBroadcast();
 
-        // 4. Save deployment
+        // Save deployment
         updateContractAddress("PeerRating", proxy);
 
         console.log("=== PeerRating Deployment Complete ===\n");
@@ -271,11 +267,10 @@ contract DeployScript is Script, DeploymentConfig {
 
         vm.startBroadcast(deployer);
 
-        // 1. Deploy implementation
         Poll implementation = new Poll();
         console.log("Implementation deployed at:", address(implementation));
 
-        // 2. Encode initialize function call
+        // Encode initialize function call
         bytes memory initData = abi.encodeWithSelector(
             Poll.initialize.selector,
             deployer, // initialOwner
@@ -284,14 +279,13 @@ contract DeployScript is Script, DeploymentConfig {
             topicRegistry // _topicRegistry
         );
 
-        // 3. Deploy proxy
         ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
         proxy = address(proxyContract);
         console.log("Proxy deployed at:", proxy);
 
         vm.stopBroadcast();
 
-        // 4. Save deployment
+        // Save deployment
         updateContractAddress("Poll", proxy);
 
         console.log("=== Poll Deployment Complete ===\n");
@@ -324,11 +318,10 @@ contract DeployScript is Script, DeploymentConfig {
 
         vm.startBroadcast(deployer);
 
-        // 1. Deploy implementation
         ReputationEngine implementation = new ReputationEngine();
         console.log("Implementation deployed at:", address(implementation));
 
-        // 2. Encode initialize function call
+        // Encode initialize function call
         bytes memory initData = abi.encodeWithSelector(
             ReputationEngine.initialize.selector,
             deployer, // initialOwner
@@ -337,14 +330,13 @@ contract DeployScript is Script, DeploymentConfig {
             topicRegistry // _topicRegistry
         );
 
-        // 3. Deploy proxy
         ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
         proxy = address(proxyContract);
         console.log("Proxy deployed at:", proxy);
 
         vm.stopBroadcast();
 
-        // 4. Save deployment
+        // Save deployment
         updateContractAddress("ReputationEngine", proxy);
 
         console.log("=== ReputationEngine Deployment Complete ===\n");
@@ -359,24 +351,22 @@ contract DeployScript is Script, DeploymentConfig {
 
         vm.startBroadcast(deployer);
 
-        // 1. Deploy implementation
         TopicRegistry implementation = new TopicRegistry();
         console.log("Implementation deployed at:", address(implementation));
 
-        // 2. Encode initialize function call
+        // Encode initialize function call
         bytes memory initData = abi.encodeWithSelector(
             TopicRegistry.initialize.selector,
             deployer // initialOwner
         );
 
-        // 3. Deploy proxy
         ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
         proxy = address(proxyContract);
         console.log("Proxy deployed at:", proxy);
 
         vm.stopBroadcast();
 
-        // 4. Save deployment
+        // Save deployment
         updateContractAddress("TopicRegistry", proxy);
 
         console.log("=== TopicRegistry Deployment Complete ===\n");
@@ -400,25 +390,23 @@ contract DeployScript is Script, DeploymentConfig {
 
         vm.startBroadcast(deployer);
 
-        // 1. Deploy implementation
         User implementation = new User();
         console.log("Implementation deployed at:", address(implementation));
 
-        // 2. Encode initialize function call
+        // Encode initialize function call
         bytes memory initData = abi.encodeWithSelector(
             User.initialize.selector,
             deployer, // initialOwner
             topicRegistry // _topicRegistry
         );
 
-        // 3. Deploy proxy
         ERC1967Proxy proxyContract = new ERC1967Proxy(address(implementation), initData);
         proxy = address(proxyContract);
         console.log("Proxy deployed at:", proxy);
 
         vm.stopBroadcast();
 
-        // 4. Save deployment
+        // Save deployment
         updateContractAddress("User", proxy);
 
         console.log("=== User Deployment Complete ===\n");

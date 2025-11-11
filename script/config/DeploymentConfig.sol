@@ -5,7 +5,8 @@ import {Script} from "forge-std/Script.sol";
 import {console} from "forge-std/console.sol";
 
 contract ServerConstants {
-    address public constant FOUNDRY_DEFAULT_SENDER = 0x1804c8AB1F12E6bbf3894d4083f33e07309d1f38;
+    // Anvil's first default account (corresponding to private key used in justfile)
+    address public constant ANVIL_DEFAULT_ACCOUNT = 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266;
 
     uint256 public constant LOCAL_CHAIN_ID = 31337;
     uint256 public constant SEPOLIA_ETH_CHAIN_ID = 11_155_111;
@@ -44,13 +45,13 @@ abstract contract DeploymentConfig is Script, ServerConstants {
      * @notice Get deployer address - works with both cast wallet and env var
      * @dev When using --account flag, msg.sender is the account
      *      When on Sepolia, reads from SEPOLIA_TEST_ACCOUNT env var
-     *      For local, uses Foundry's default sender
+     *      For local/Anvil, uses Anvil's first default account
      */
     function getDeployer() internal view returns (address) {
         if (block.chainid == SEPOLIA_ETH_CHAIN_ID) {
             return vm.envAddress("SEPOLIA_TEST_ACCOUNT");
         } else {
-            return FOUNDRY_DEFAULT_SENDER;
+            return ANVIL_DEFAULT_ACCOUNT;
         }
     }
 
