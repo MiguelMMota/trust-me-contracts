@@ -202,8 +202,6 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             attemptedAt: uint64(block.timestamp)
         });
 
-
-
         userChallengeHistory[msg.sender].push(challengeId);
 
         // Update challenge stats
@@ -213,7 +211,7 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         }
 
         // Update user's expertise score on this topic
-        ReputationEngine(reputationEngine).calculateExpertiseScore(ratee, topicId);
+        ReputationEngine(reputationEngine).calculateExpertiseScore(msg.sender, challenge.topicId);
 
         emit ChallengeAttempted(challengeId, msg.sender, isCorrect, uint64(block.timestamp));
     }
