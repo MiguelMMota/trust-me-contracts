@@ -25,6 +25,8 @@ deploy-local:
     forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --broadcast
     @echo "\nUpdating dapp contract addresses..."
     @./script/update-dapp-addresses.sh anvil
+    @echo "\nCopying ABIs to dapp..."
+    @just copy-abis
 
 # Deploy all contracts to Sepolia testnet
 deploy-sepolia:
@@ -34,6 +36,8 @@ deploy-sepolia:
     @just verify-proxies sepolia
     @echo "\nUpdating dapp contract addresses..."
     @./script/update-dapp-addresses.sh sepolia
+    @echo "\nCopying ABIs to dapp..."
+    @just copy-abis
 
 # ===========================================
 # Contract Upgrades
@@ -51,6 +55,9 @@ upgrade CONTRACT NETWORK:
         echo "Error: Network must be 'local' or 'sepolia'"
         exit 1
     fi
+    echo ""
+    echo "Copying ABIs to dapp..."
+    just copy-abis
 
 # Show contract sizes
 size:
@@ -58,6 +65,22 @@ size:
 
 coverage:
     forge coverage --no-match-coverage script
+
+# ===========================================
+# ABI Management
+# ===========================================
+
+# Copy contract ABIs to dapp directory
+copy-abis:
+    @echo "Copying contract ABIs to ../trust-me-dapp/abis/contracts..."
+    @mkdir -p ../trust-me-dapp/abis/contracts
+    @cp out/Challenge.sol/Challenge.json ../trust-me-dapp/abis/contracts/
+    @cp out/PeerRating.sol/PeerRating.json ../trust-me-dapp/abis/contracts/
+    @cp out/Poll.sol/Poll.json ../trust-me-dapp/abis/contracts/
+    @cp out/ReputationEngine.sol/ReputationEngine.json ../trust-me-dapp/abis/contracts/
+    @cp out/TopicRegistry.sol/TopicRegistry.json ../trust-me-dapp/abis/contracts/
+    @cp out/User.sol/User.json ../trust-me-dapp/abis/contracts/
+    @echo "ABIs copied successfully!"
 
 # ===========================================
 # Verification
