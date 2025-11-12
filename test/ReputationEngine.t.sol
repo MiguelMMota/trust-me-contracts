@@ -92,7 +92,6 @@ contract ReputationEngineTest is Test {
 
         vm.prank(alice);
         challengeContract.attemptChallenge(challengeId, answerHash);
-        reputationEngine.processChallengeAttempt(alice, challengeId);
 
         uint16 initialScore = userContract.getUserScore(alice, mathTopicId);
 

@@ -87,31 +87,6 @@ contract ReputationEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable 
     }
 
     /**
-     * @notice Process challenge attempt and update user score
-     * @param user User address
-     * @param challengeId Challenge ID
-     */
-    function processChallengeAttempt(address user, uint64 challengeId) external {
-        // Verify the attempt exists
-        Challenge.ChallengeAttempt memory attempt = challengeContract.getUserAttempt(user, challengeId);
-        if (attempt.attemptedAt == 0) revert InvalidInput();
-
-        // Get challenge data
-        Challenge.ChallengeData memory challengeData = challengeContract.getChallenge(challengeId);
-
-        // Record attempt in user contract
-        userContract.recordChallengeAttempt(user, challengeData.topicId, attempt.isCorrect);
-
-        // Calculate and update score
-        uint16 newScore = calculateExpertiseScore(user, challengeData.topicId);
-        uint16 oldScore = userContract.getUserScore(user, challengeData.topicId);
-
-        userContract.updateExpertiseScore(user, challengeData.topicId, newScore);
-
-        emit ScoreCalculated(user, challengeData.topicId, oldScore, newScore);
-    }
-
-    /**
      * @notice Recalculate score for a user in a topic (can be called by anyone for transparency)
      * @param user User address
      * @param topicId Topic ID

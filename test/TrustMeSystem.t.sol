@@ -114,7 +114,6 @@ contract TrustMeSystemTest is Test {
             } else {
                 challengeContract.attemptChallenge(challengeIds[i], answerHashes[i]);
             }
-            reputationEngine.processChallengeAttempt(alice, challengeIds[i]);
         }
 
         // Check final stats
@@ -149,7 +148,6 @@ contract TrustMeSystemTest is Test {
 
             vm.prank(alice);
             challengeContract.attemptChallenge(challengeId, answerHash);
-            reputationEngine.processChallengeAttempt(alice, challengeId);
         }
 
         // Bob has minimal expertise (just registered)
@@ -203,7 +201,6 @@ contract TrustMeSystemTest is Test {
             } else {
                 challengeContract.attemptChallenge(challengeId, keccak256(abi.encodePacked("wrong"))); // Wrong
             }
-            reputationEngine.processChallengeAttempt(alice, challengeId);
         }
 
         uint16 accuracy = userContract.getAccuracy(alice, mathTopicId);
