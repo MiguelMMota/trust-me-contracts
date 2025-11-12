@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {ReputationEngine} from "./ReputationEngine.sol";
 import {TopicRegistry} from "./TopicRegistry.sol";
 import {User} from "./User.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -201,6 +202,8 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             attemptedAt: uint64(block.timestamp)
         });
 
+
+
         userChallengeHistory[msg.sender].push(challengeId);
 
         // Update challenge stats
@@ -208,6 +211,9 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         if (isCorrect) {
             challenge.correctAttempts++;
         }
+
+        // Update user's expertise score on this topic
+        ReputationEngine(reputationEngine).calculateExpertiseScore(ratee, topicId);
 
         emit ChallengeAttempted(challengeId, msg.sender, isCorrect, uint64(block.timestamp));
     }
