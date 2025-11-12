@@ -160,10 +160,10 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     {
         address rater = msg.sender;
         _validateRateUserInputs(ratee, rater, topicId, score);
-        
+
         // Check if rater has rated before and enforce cooldown period
         uint64 timestamp = uint64(block.timestamp);
-        uint64[] storage timestamps = ratingTimestamps[ratee][topicId][rater];   
+        uint64[] storage timestamps = ratingTimestamps[ratee][topicId][rater];
 
         bool isFirstRatingFromRater = timestamps.length == 0;
         if (!isFirstRatingFromRater) {
@@ -471,8 +471,6 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 
-
-
     /**
      * @notice inner function to validate inputs to rate a user on a topic
      * @param rater Address of the user giving the rating
@@ -494,7 +492,7 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         TopicRegistry.Topic memory topic = topicRegistry.getTopic(topicId);
         if (!topic.isActive) revert InvalidTopicId();
     }
-    
+
     /**
      * @notice inner function to record a user rating and recalculate user score for the respective topic
      * @param rater Address of the user giving the rating
@@ -508,9 +506,9 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         onlyRegistered(ratee)
     {
         uint64 timestamp = uint64(block.timestamp);
-        
+
         // Check if rater has rated before and enforce cooldown period
-        uint64[] storage timestamps = ratingTimestamps[ratee][topicId][rater];   
+        uint64[] storage timestamps = ratingTimestamps[ratee][topicId][rater];
 
         // Create new rating entry at this timestamp
         Rating storage rating = ratings[ratee][topicId][rater][timestamp];
