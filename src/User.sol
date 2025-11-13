@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
+import {ReputationEngine} from "./ReputationEngine.sol";
 import {TopicRegistry} from "./TopicRegistry.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -46,7 +47,7 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     ///////////////////////////*/
 
     // Constants
-    uint16 public constant MIN_SCORE = 50;
+    uint16 public constant MIN_SCORE = 0;
     uint16 public constant MAX_SCORE = 1000;
     uint16 public constant INITIAL_SCORE = 50;
 
@@ -155,7 +156,6 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
         // Initialize if first attempt in this topic
         if (expertise.totalChallenges == 0) {
-            expertise.score = INITIAL_SCORE;
             userTopics[user].push(topicId);
             userProfiles[user].totalTopicsEngaged++;
         }
@@ -165,6 +165,7 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             expertise.correctChallenges++;
         }
         expertise.lastActivityTime = uint64(block.timestamp);
+        ReputationEngine(reputationEngine).recalculateScore(user, topicId);
 
         emit ChallengeAttempted(user, topicId, correct);
     }
@@ -204,11 +205,7 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
      * @return score Expertise score (0-1000)
      */
     function getUserScore(address user, uint32 topicId) external view returns (uint16) {
-        UserTopicExpertise memory expertise = userExpertise[user][topicId];
-        if (expertise.totalChallenges == 0) {
-            return INITIAL_SCORE; // Default score for new topics
-        }
-        return expertise.score;
+        return userExpertise[user][topicId].score;
     }
 
     /**
