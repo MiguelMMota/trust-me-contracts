@@ -28,6 +28,11 @@ deploy-local:
     @echo "\nCopying ABIs to dapp..."
     @just copy-abis
 
+
+# Debug deployment script interactively with breakpoints
+debug-deploy:
+    forge script script/Deploy.s.sol --rpc-url http://localhost:8545 --private-key 0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 --debug
+
 # Deploy all contracts to Sepolia testnet
 deploy-sepolia:
     forge script script/Deploy.s.sol --rpc-url $SEPOLIA_RPC_URL --account sepoliaKey --password-file .password --broadcast --verify
