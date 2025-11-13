@@ -68,6 +68,9 @@ contract DeployScript is Script, DeploymentConfig {
 
         vm.stopBroadcast();
 
+        // We can only fill the PeerRating data after setting its reputation engine contract
+        fillPeerRatingData(peerRatingContract, deployer);
+
         // Print deployment summary
         console.log("\n===============================================");
         console.log("         Deployment Summary");
@@ -236,8 +239,6 @@ contract DeployScript is Script, DeploymentConfig {
         updateContractAddress("PeerRating", proxy);
 
         console.log("=== PeerRating Deployment Complete ===\n");
-
-        fillPeerRatingData(proxy, deployer);
 
         return proxy;
     }

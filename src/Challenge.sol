@@ -211,7 +211,7 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         }
 
         // Update user's expertise score on this topic
-        ReputationEngine(reputationEngine).calculateExpertiseScore(msg.sender, challenge.topicId);
+        ReputationEngine(reputationEngine).recalculateScore(msg.sender, challenge.topicId);
 
         emit ChallengeAttempted(challengeId, msg.sender, isCorrect, uint64(block.timestamp));
     }

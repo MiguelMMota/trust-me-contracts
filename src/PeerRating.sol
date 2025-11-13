@@ -528,7 +528,7 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         timestamps.push(timestamp);
 
         // Track this rater if first time rating this user on this topic
-        bool isFirstRatingFromRater = timestamps.length == 0;
+        bool isFirstRatingFromRater = timestamps.length == 1;
         if (isFirstRatingFromRater) {
             topicRaters[ratee][topicId].push(rater);
 
@@ -539,7 +539,7 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         }
 
         // Update user's expertise score on this topic
-        ReputationEngine(reputationEngine).calculateExpertiseScore(ratee, topicId);
+        ReputationEngine(reputationEngine).recalculateScore(ratee, topicId);
 
         // Emit appropriate event
         if (isFirstRatingFromRater) {

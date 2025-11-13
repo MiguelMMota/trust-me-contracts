@@ -91,7 +91,7 @@ contract ReputationEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable 
      * @param user User address
      * @param topicId Topic ID
      */
-    function recalculateScore(address user, uint32 topicId) external {
+    function recalculateScore(address user, uint32 topicId) public {
         uint16 oldScore = userContract.getUserScore(user, topicId);
         uint16 newScore = calculateExpertiseScore(user, topicId);
 
@@ -108,13 +108,7 @@ contract ReputationEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable 
      */
     function batchRecalculateScores(address user, uint32[] calldata topicIds) external {
         for (uint256 i = 0; i < topicIds.length; i++) {
-            uint16 oldScore = userContract.getUserScore(user, topicIds[i]);
-            uint16 newScore = calculateExpertiseScore(user, topicIds[i]);
-
-            if (oldScore != newScore) {
-                userContract.updateExpertiseScore(user, topicIds[i], newScore);
-                emit ScoreCalculated(user, topicIds[i], oldScore, newScore);
-            }
+            recalculateScore(user, topicIds[i]);
         }
     }
 
