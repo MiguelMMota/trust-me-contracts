@@ -186,6 +186,8 @@ These will be symlinked to the [frontend dapp repository](https://github.com/Mig
 
 4. Give users the option to reject positive feedback. One of the ways to discourage inflated ratings would be to retro-actively adjust user scores when an inconsistency is detected. If users are allowed to reject positive feedback (e.g.: feedback above their rating), one possible approach is to deliberately overcorrect. This encourages users to reject inflated ratings from others, which in turn encourages users to rate honestly.
 
+5. Rating templates. Some feedback isn't properly summarised in a single score. For example, scientific papers may be rated with respect to their relevance, innovative ideas, clarity, completeness, reliability, etc.
+
 
 ## Challenges
 
