@@ -21,6 +21,7 @@ contract ReputationEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable 
 
     error Unauthorized();
     error InvalidInput();
+    error InvalidTeamId();
 
     /*///////////////////////////
        STATE VARIABLES
@@ -46,6 +47,9 @@ contract ReputationEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable 
     ///////////////////////////*/
 
     event ScoreCalculated(address indexed user, uint32 indexed topicId, uint16 oldScore, uint16 newScore);
+    event TeamScoreCalculated(
+        uint64 indexed teamId, address indexed user, uint32 indexed topicId, uint16 oldScore, uint16 newScore
+    );
 
     /*///////////////////////////
          CONSTRUCTOR
@@ -125,6 +129,18 @@ contract ReputationEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable 
     }
 
     /**
+     * @notice Get voting weight for a user in a team context
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @return weight Voting weight based on team expertise score
+     */
+    function getTeamVotingWeight(uint64 teamId, address user, uint32 topicId) external view returns (uint256) {
+        if (teamId == 0) revert InvalidTeamId();
+        return uint256(userContract.getTeamUserScore(teamId, user, topicId));
+    }
+
+    /**
      * @notice Preview what score a user would have with an additional correct/incorrect answer
      * @param user User address
      * @param topicId Topic ID
@@ -178,6 +194,36 @@ contract ReputationEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable 
         if (rawScore > MAX_SCORE) return MAX_SCORE;
 
         return uint16(rawScore);
+    }
+
+    /**
+     * @notice Recalculate score for a user in a team context
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     */
+    function recalculateTeamScore(uint64 teamId, address user, uint32 topicId) public {
+        if (teamId == 0) revert InvalidTeamId();
+
+        uint16 oldScore = userContract.getTeamUserScore(teamId, user, topicId);
+        uint16 newScore = calculateTeamExpertiseScore(teamId, user, topicId);
+
+        if (oldScore != newScore) {
+            userContract.updateTeamExpertiseScore(teamId, user, topicId, newScore);
+            emit TeamScoreCalculated(teamId, user, topicId, oldScore, newScore);
+        }
+    }
+
+    /**
+     * @notice Batch recalculate scores for a user in a team across multiple topics
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicIds Array of topic IDs
+     */
+    function batchRecalculateTeamScores(uint64 teamId, address user, uint32[] calldata topicIds) external {
+        for (uint256 i = 0; i < topicIds.length; i++) {
+            recalculateTeamScore(teamId, user, topicIds[i]);
+        }
     }
 
     /*///////////////////////////
@@ -326,6 +372,177 @@ contract ReputationEngine is Initializable, UUPSUpgradeable, OwnableUpgradeable 
 
         // Combine base score with volume bonus
         // Base score weighted 80%, volume bonus weighted 20%
+        uint256 weightedBase = (baseScore * 80) / 100;
+        uint256 weightedVolumeBonus = (ratingVolumeBonus * 20) / 100;
+
+        // Apply time decay
+        uint256 rawScore = ((weightedBase + weightedVolumeBonus) * timeDecayFactor) / 100;
+
+        // Ensure score is within bounds
+        if (rawScore < MIN_SCORE) rawScore = MIN_SCORE;
+        if (rawScore > MAX_SCORE) rawScore = MAX_SCORE;
+
+        return uint16(rawScore);
+    }
+
+    /**
+     * @notice Calculate expertise score for a user in a team context
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @return finalScore Calculated score (50-1000)
+     */
+    function calculateTeamExpertiseScore(uint64 teamId, address user, uint32 topicId) public view returns (uint16) {
+        return calculateTeamExpertiseScore(teamId, user, topicId, uint64(block.timestamp));
+    }
+
+    /**
+     * @notice Calculate expertise score for a user in a team at a specific time
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @param scoreTime Calculate score as of this timestamp
+     * @return finalScore Calculated score (50-1000)
+     */
+    function calculateTeamExpertiseScore(uint64 teamId, address user, uint32 topicId, uint64 scoreTime)
+        public
+        view
+        returns (uint16)
+    {
+        if (teamId == 0) revert InvalidTeamId();
+
+        uint16 challengeScore = calculateTeamChallengeScore(teamId, user, topicId, scoreTime);
+        uint16 peerRatingScore = calculateTeamPeerRatingScore(teamId, user, topicId, scoreTime);
+
+        // If neither score exists, return minimum
+        if (challengeScore == 0 && peerRatingScore == 0) {
+            return MIN_SCORE;
+        }
+
+        // If only one exists, return that score
+        if (challengeScore == 0) return peerRatingScore;
+        if (peerRatingScore == 0) return challengeScore;
+
+        // If both exist, use a blended approach that rewards having both
+        uint256 blendedScore = (uint256(challengeScore) * 60 + uint256(peerRatingScore) * 40) / 100;
+
+        // Return the highest score
+        uint16 maxScore = challengeScore > peerRatingScore ? challengeScore : peerRatingScore;
+        uint16 finalScore = uint16(blendedScore) > maxScore ? uint16(blendedScore) : maxScore;
+
+        // Ensure score is within bounds
+        if (finalScore < MIN_SCORE) return MIN_SCORE;
+        if (finalScore > MAX_SCORE) return MAX_SCORE;
+
+        return finalScore;
+    }
+
+    /**
+     * @notice Calculate challenge-based expertise score in team context
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @return score Challenge-based score (0-1000)
+     */
+    function calculateTeamChallengeScore(uint64 teamId, address user, uint32 topicId) public view returns (uint16) {
+        return calculateTeamChallengeScore(teamId, user, topicId, uint64(block.timestamp));
+    }
+
+    /**
+     * @notice Calculate challenge-based expertise score in team context at a specific time
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @param scoreTime Calculate score as of this timestamp
+     * @return score Challenge-based score (0-1000)
+     */
+    function calculateTeamChallengeScore(uint64 teamId, address user, uint32 topicId, uint64 scoreTime)
+        public
+        view
+        returns (uint16)
+    {
+        if (teamId == 0) revert InvalidTeamId();
+
+        User.UserTopicExpertise memory expertise = userContract.getTeamUserExpertise(teamId, user, topicId);
+
+        // If no challenges attempted or last activity is after scoreTime, return 0
+        if (expertise.totalChallenges == 0 || expertise.lastActivityTime > scoreTime) {
+            return 0;
+        }
+
+        // Calculate accuracy component (0-1000)
+        uint256 accuracyScore = (uint256(expertise.correctChallenges) * 1000) / expertise.totalChallenges;
+
+        // Calculate volume bonus
+        uint256 volumeBonus = calculateVolumeBonus(expertise.totalChallenges);
+
+        // Calculate time decay factor
+        uint256 timeDecayFactor = calculateTimeDecay(expertise.lastActivityTime, scoreTime);
+
+        // Combine components
+        uint256 weightedAccuracy = (accuracyScore * ACCURACY_WEIGHT) / 100;
+        uint256 weightedVolume = (volumeBonus * VOLUME_WEIGHT) / 100;
+
+        // Apply time decay
+        uint256 rawScore = ((weightedAccuracy + weightedVolume) * timeDecayFactor) / 100;
+
+        // Ensure score is within bounds
+        if (rawScore < MIN_SCORE) rawScore = MIN_SCORE;
+        if (rawScore > MAX_SCORE) rawScore = MAX_SCORE;
+
+        return uint16(rawScore);
+    }
+
+    /**
+     * @notice Calculate peer rating-based expertise score in team context
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @return score Peer rating score (0-1000)
+     */
+    function calculateTeamPeerRatingScore(uint64 teamId, address user, uint32 topicId) public view returns (uint16) {
+        return calculateTeamPeerRatingScore(teamId, user, topicId, uint64(block.timestamp));
+    }
+
+    /**
+     * @notice Calculate peer rating-based expertise score in team context at a specific time
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @param scoreTime Calculate score as of this timestamp
+     * @return score Peer rating score (0-1000)
+     */
+    function calculateTeamPeerRatingScore(uint64 teamId, address user, uint32 topicId, uint64 scoreTime)
+        public
+        view
+        returns (uint16)
+    {
+        if (teamId == 0) revert InvalidTeamId();
+
+        // Return 0 if peer rating contract not set
+        if (address(peerRatingContract) == address(0)) {
+            return 0;
+        }
+
+        // Get team ratings as they were at scoreTime
+        PeerRating.UserTopicRatings memory ratings =
+            peerRatingContract.getTeamUserTopicRatingAtTime(teamId, user, topicId, scoreTime);
+
+        // If no ratings received before scoreTime, return 0
+        if (ratings.totalRatings == 0) {
+            return 0;
+        }
+
+        // Base score is the average peer rating
+        uint256 baseScore = ratings.averageScore;
+
+        // Apply volume bonus
+        uint256 ratingVolumeBonus = calculateRatingVolumeBonus(ratings.totalRatings);
+
+        // Apply time decay
+        uint256 timeDecayFactor = calculateTimeDecay(ratings.lastRatingTime, scoreTime);
+
+        // Combine base score with volume bonus
         uint256 weightedBase = (baseScore * 80) / 100;
         uint256 weightedVolumeBonus = (ratingVolumeBonus * 20) / 100;
 

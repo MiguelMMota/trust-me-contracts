@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ReputationEngine} from "./ReputationEngine.sol";
 import {TopicRegistry} from "./TopicRegistry.sol";
+import {TeamRegistry} from "./TeamRegistry.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {OwnableUpgradeable} from "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
@@ -21,6 +22,9 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     error UserNotRegistered();
     error Unauthorized();
     error InvalidTopicId();
+    error TeamRegistryNotSet();
+    error NotTeamMember();
+    error InvalidTeamId();
 
     /*///////////////////////////
       TYPE DECLARATIONS
@@ -51,11 +55,23 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     uint16 public constant MAX_SCORE = 1000;
     uint16 public constant INITIAL_SCORE = 50;
 
+    // Global context (teamId = 0) - Backward compatibility
     mapping(address => UserProfile) public userProfiles;
     mapping(address => mapping(uint32 => UserTopicExpertise)) public userExpertise; // user => topicId => expertise
     mapping(address => uint32[]) public userTopics; // user => engaged topic IDs
 
+    // Team-scoped user data (teamId > 0)
+    // teamId => user => UserProfile
+    mapping(uint64 => mapping(address => UserProfile)) private _teamUserProfiles;
+
+    // teamId => user => topicId => expertise
+    mapping(uint64 => mapping(address => mapping(uint32 => UserTopicExpertise))) private _teamUserExpertise;
+
+    // teamId => user => topicIds[]
+    mapping(uint64 => mapping(address => uint32[])) private _teamUserTopics;
+
     TopicRegistry public topicRegistry;
+    TeamRegistry private _teamRegistry;
     address public reputationEngine; // Will be set after ReputationEngine deployment
     address public peerRatingContract; // Will be set after PeerRating deployment
 
@@ -66,6 +82,10 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     event UserRegistered(address indexed user, uint64 timestamp);
     event ExpertiseUpdated(address indexed user, uint32 indexed topicId, uint16 newScore);
     event ChallengeAttempted(address indexed user, uint32 indexed topicId, bool correct);
+    event TeamUserRegistered(uint64 indexed teamId, address indexed user, uint64 timestamp);
+    event TeamExpertiseUpdated(uint64 indexed teamId, address indexed user, uint32 indexed topicId, uint16 newScore);
+    event TeamChallengeAttempted(uint64 indexed teamId, address indexed user, uint32 indexed topicId, bool correct);
+    event TeamRegistrySet(address indexed teamRegistry);
 
     /*///////////////////////////
          MODIFIERS
@@ -78,6 +98,19 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
     modifier onlyRegistered(address user) {
         if (!userProfiles[user].isRegistered) revert UserNotRegistered();
+        _;
+    }
+
+    modifier onlyTeamMember(uint64 teamId, address user) {
+        if (teamId == 0) revert InvalidTeamId(); // 0 is reserved for global
+        if (address(_teamRegistry) == address(0)) revert TeamRegistryNotSet();
+        if (!_teamRegistry.isTeamMember(teamId, user)) revert NotTeamMember();
+        _;
+    }
+
+    modifier onlyRegisteredInTeam(uint64 teamId, address user) {
+        if (teamId == 0) revert InvalidTeamId();
+        if (!_teamUserProfiles[teamId][user].isRegistered) revert UserNotRegistered();
         _;
     }
 
@@ -184,6 +217,104 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         emit ExpertiseUpdated(user, topicId, newScore);
     }
 
+    /**
+     * @notice Set the TeamRegistry contract address
+     * @param teamRegistry Address of the TeamRegistry contract
+     */
+    function setTeamRegistry(address teamRegistry) external onlyOwner {
+        _teamRegistry = TeamRegistry(teamRegistry);
+        emit TeamRegistrySet(teamRegistry);
+    }
+
+    /**
+     * @notice Register user in a team context
+     * @param teamId The ID of the team
+     * @param name The name of the user
+     */
+    function registerUserInTeam(uint64 teamId, string calldata name) external onlyTeamMember(teamId, msg.sender) {
+        _registerUserInTeam(teamId, msg.sender, name);
+    }
+
+    /**
+     * @notice Admin register user in a team context
+     * @param teamId The ID of the team
+     * @param userAddress The address of the user to register
+     * @param name The name of the user
+     */
+    function adminRegisterUserInTeam(uint64 teamId, address userAddress, string calldata name) external onlyOwner {
+        _registerUserInTeam(teamId, userAddress, name);
+    }
+
+    /**
+     * @notice Record a challenge attempt in team context (called by ReputationEngine)
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @param correct Whether the answer was correct
+     */
+    function recordTeamChallengeAttempt(uint64 teamId, address user, uint32 topicId, bool correct)
+        external
+        onlyReputationEngine
+    {
+        if (teamId == 0) revert InvalidTeamId();
+        if (!_teamUserProfiles[teamId][user].isRegistered) revert UserNotRegistered();
+
+        // Verify topic exists (either in global or team registry)
+        bool topicExists = false;
+        try topicRegistry.getTopic(topicId) returns (TopicRegistry.Topic memory topic) {
+            if (topic.isActive && topicRegistry.isTopicEnabledInTeam(teamId, topicId)) {
+                topicExists = true;
+            }
+        } catch {}
+
+        if (!topicExists) {
+            // Check if it's a team-specific topic
+            try topicRegistry.getTeamTopic(teamId, topicId) returns (TopicRegistry.Topic memory teamTopic) {
+                if (teamTopic.isActive) {
+                    topicExists = true;
+                }
+            } catch {}
+        }
+
+        if (!topicExists) revert InvalidTopicId();
+
+        UserTopicExpertise storage expertise = _teamUserExpertise[teamId][user][topicId];
+
+        // Initialize if first attempt in this topic
+        if (expertise.totalChallenges == 0) {
+            _teamUserTopics[teamId][user].push(topicId);
+            _teamUserProfiles[teamId][user].totalTopicsEngaged++;
+        }
+
+        expertise.totalChallenges++;
+        if (correct) {
+            expertise.correctChallenges++;
+        }
+        expertise.lastActivityTime = uint64(block.timestamp);
+        ReputationEngine(reputationEngine).recalculateTeamScore(teamId, user, topicId);
+
+        emit TeamChallengeAttempted(teamId, user, topicId, correct);
+    }
+
+    /**
+     * @notice Update user's expertise score in team context (called by ReputationEngine)
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @param newScore New expertise score
+     */
+    function updateTeamExpertiseScore(uint64 teamId, address user, uint32 topicId, uint16 newScore)
+        external
+        onlyReputationEngine
+    {
+        if (teamId == 0) revert InvalidTeamId();
+        if (newScore > MAX_SCORE) newScore = MAX_SCORE;
+        if (newScore < MIN_SCORE) newScore = MIN_SCORE;
+
+        _teamUserExpertise[teamId][user][topicId].score = newScore;
+        emit TeamExpertiseUpdated(teamId, user, topicId, newScore);
+    }
+
     /*///////////////////////////
         VIEW FUNCTIONS
     ///////////////////////////*/
@@ -247,6 +378,83 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         return userProfiles[user].isRegistered;
     }
 
+    /**
+     * @notice Get user's expertise in a team context
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @return expertise UserTopicExpertise struct
+     */
+    function getTeamUserExpertise(uint64 teamId, address user, uint32 topicId)
+        external
+        view
+        returns (UserTopicExpertise memory)
+    {
+        return _teamUserExpertise[teamId][user][topicId];
+    }
+
+    /**
+     * @notice Get user's expertise score in team context
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @return score Expertise score (0-1000)
+     */
+    function getTeamUserScore(uint64 teamId, address user, uint32 topicId) external view returns (uint16) {
+        return _teamUserExpertise[teamId][user][topicId].score;
+    }
+
+    /**
+     * @notice Get all topics a user has engaged with in a team context
+     * @param teamId The ID of the team
+     * @param user User address
+     * @return Array of topic IDs
+     */
+    function getTeamUserTopics(uint64 teamId, address user) external view returns (uint32[] memory) {
+        return _teamUserTopics[teamId][user];
+    }
+
+    /**
+     * @notice Get user profile in team context
+     * @param teamId The ID of the team
+     * @param user User address
+     * @return UserProfile struct
+     */
+    function getTeamUserProfile(uint64 teamId, address user) external view returns (UserProfile memory) {
+        return _teamUserProfiles[teamId][user];
+    }
+
+    /**
+     * @notice Calculate accuracy percentage for a user in a topic in team context
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @return accuracy Accuracy in basis points (0-10000, where 10000 = 100%)
+     */
+    function getTeamAccuracy(uint64 teamId, address user, uint32 topicId) external view returns (uint16) {
+        UserTopicExpertise memory expertise = _teamUserExpertise[teamId][user][topicId];
+        if (expertise.totalChallenges == 0) return 0;
+        return uint16((expertise.correctChallenges * 10000) / expertise.totalChallenges);
+    }
+
+    /**
+     * @notice Check if user is registered in a team
+     * @param teamId The ID of the team
+     * @param user User address
+     * @return true if registered in team
+     */
+    function isRegisteredInTeam(uint64 teamId, address user) external view returns (bool) {
+        return _teamUserProfiles[teamId][user].isRegistered;
+    }
+
+    /**
+     * @notice Get the TeamRegistry contract address
+     * @return teamRegistry The TeamRegistry contract address
+     */
+    function getTeamRegistry() external view returns (address teamRegistry) {
+        return address(_teamRegistry);
+    }
+
     /*///////////////////////////
       INTERNAL FUNCTIONS
     ///////////////////////////*/
@@ -274,5 +482,26 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         });
 
         emit UserRegistered(userAddress, uint64(block.timestamp));
+    }
+
+    /**
+     * @notice Register a new user in a team context
+     * @param teamId The ID of the team
+     * @param userAddress The address of the user
+     * @param name The name of the user
+     */
+    function _registerUserInTeam(uint64 teamId, address userAddress, string calldata name) private {
+        if (teamId == 0) revert InvalidTeamId();
+        if (_teamUserProfiles[teamId][userAddress].isRegistered) revert UserAlreadyRegistered();
+
+        _teamUserProfiles[teamId][userAddress] = UserProfile({
+            userAddress: userAddress,
+            isRegistered: true,
+            registrationTime: uint64(block.timestamp),
+            totalTopicsEngaged: 0,
+            name: name
+        });
+
+        emit TeamUserRegistered(teamId, userAddress, uint64(block.timestamp));
     }
 }

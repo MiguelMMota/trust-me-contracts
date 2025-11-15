@@ -396,6 +396,29 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     }
 
     /**
+     * @notice Get aggregate ratings for a user in a team context at a specific time
+     * @param teamId The ID of the team
+     * @param user User address
+     * @param topicId Topic ID
+     * @param scoreTime Calculate ratings as of this timestamp
+     * @return UserTopicRatings struct calculated at scoreTime in team context
+     * @dev TODO: Implement full team-scoped rating storage and retrieval
+     */
+    function getTeamUserTopicRatingAtTime(uint64 teamId, address user, uint32 topicId, uint64 scoreTime)
+        external
+        view
+        returns (UserTopicRatings memory)
+    {
+        // STUB: Placeholder for team-scoped ratings
+        // Returns empty ratings for now - needs full implementation
+        teamId; // Silence unused parameter warning
+        user;
+        topicId;
+        scoreTime;
+        return UserTopicRatings({averageScore: 0, totalRatings: 0, lastRatingTime: 0});
+    }
+
+    /**
      * @notice Get all raters who have rated a user on a topic
      * @param user User address
      * @param topicId Topic ID
