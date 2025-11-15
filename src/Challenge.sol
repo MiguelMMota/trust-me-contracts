@@ -210,8 +210,8 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             challenge.correctAttempts++;
         }
 
-        // Update user's expertise score on this topic
-        ReputationEngine(reputationEngine).recalculateScore(msg.sender, challenge.topicId);
+        // Record challenge attempt in user profile (which will trigger score recalculation)
+        userContract.recordChallengeAttempt(msg.sender, challenge.topicId, isCorrect);
 
         emit ChallengeAttempted(challengeId, msg.sender, isCorrect, uint64(block.timestamp));
     }

@@ -47,6 +47,12 @@ contract PeerRatingTest is Test {
         ERC1967Proxy peerRatingProxy = new ERC1967Proxy(address(peerRatingImpl), peerRatingInitData);
         peerRating = PeerRating(address(peerRatingProxy));
 
+        // Set reputation engine
+        peerRating.setReputationEngine(reputationEngine);
+
+        // Mock recalculateScore calls on reputation engine
+        vm.mockCall(reputationEngine, abi.encodeWithSignature("recalculateScore(address,uint32)"), abi.encode());
+
         // Create topics
         mathTopicId = topicRegistry.createTopic("Mathematics", 0);
         scienceTopicId = topicRegistry.createTopic("Science", 0);
@@ -81,19 +87,16 @@ contract PeerRatingTest is Test {
         assertEq(peerRating.RATING_COOLDOWN_PERIOD(), 182 days);
     }
 
-    function testSetReputationEngine() public {
-        vm.prank(admin);
-        peerRating.setReputationEngine(reputationEngine);
+    function testSetReputationEngine() public view {
+        // Already set in setUp
         assertEq(peerRating.reputationEngine(), reputationEngine);
     }
 
     function testSetReputationEngineOnlyOnce() public {
-        vm.startPrank(admin);
-        peerRating.setReputationEngine(reputationEngine);
-
+        // Already set in setUp, so trying to set again should revert
+        vm.prank(admin);
         vm.expectRevert(PeerRating.Unauthorized.selector);
         peerRating.setReputationEngine(address(999));
-        vm.stopPrank();
     }
 
     function testSetReputationEngineOnlyOwner() public {

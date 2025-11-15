@@ -56,6 +56,7 @@ contract ReputationEngineTest is Test {
 
         // Set reputation engine in User and Challenge contracts
         userContract.setReputationEngine(address(reputationEngine));
+        userContract.setChallengeContract(address(challengeContract));
         challengeContract.setReputationEngine(address(reputationEngine));
 
         // Create initial topic
@@ -93,7 +94,16 @@ contract ReputationEngineTest is Test {
         vm.prank(alice);
         challengeContract.attemptChallenge(challengeId, answerHash);
 
+        // Check challenge attempt was recorded
+        User.UserTopicExpertise memory expertise = userContract.getUserExpertise(alice, mathTopicId);
+        console.log("Total challenges:", expertise.totalChallenges);
+        console.log("Correct challenges:", expertise.correctChallenges);
+
         uint16 initialScore = userContract.getUserScore(alice, mathTopicId);
+        console.log("Initial score:", initialScore);
+
+        uint16 calculatedScore = reputationEngine.calculateExpertiseScore(alice, mathTopicId);
+        console.log("Calculated score:", calculatedScore);
 
         // Simulate 31 days passing
         vm.warp(block.timestamp + 31 days);
@@ -101,10 +111,9 @@ contract ReputationEngineTest is Test {
         // Recalculate score - should have time decay applied
         reputationEngine.recalculateScore(alice, mathTopicId);
         uint16 decayedScore = userContract.getUserScore(alice, mathTopicId);
+        console.log("Score after 31 days:", decayedScore);
 
         // Score should decrease due to time decay
-        assertTrue(decayedScore < initialScore);
-        console.log("Initial score:", initialScore);
-        console.log("Score after 31 days:", decayedScore);
+        assertGt(initialScore, decayedScore, "Initial score should be greater than decayed score");
     }
 }

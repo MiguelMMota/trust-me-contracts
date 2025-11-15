@@ -41,6 +41,14 @@ contract ChallengeTest is Test {
         ERC1967Proxy challengeProxy = new ERC1967Proxy(address(challengeImpl), challengeInitData);
         challengeContract = Challenge(address(challengeProxy));
 
+        // Set challenge contract in User
+        userContract.setChallengeContract(address(challengeContract));
+
+        // Set reputation engine (mock address for tests that don't need full reputation engine)
+        address mockReputationEngine = address(7);
+        userContract.setReputationEngine(mockReputationEngine);
+        vm.mockCall(mockReputationEngine, abi.encodeWithSignature("recalculateScore(address,uint32)"), abi.encode());
+
         // Create initial topic
         mathTopicId = topicRegistry.createTopic("Mathematics", 0);
 

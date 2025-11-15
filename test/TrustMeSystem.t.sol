@@ -70,6 +70,7 @@ contract TrustMeSystemTest is Test {
 
         // Set reputation engine in User and Challenge contracts
         userContract.setReputationEngine(address(reputationEngine));
+        userContract.setChallengeContract(address(challengeContract));
         challengeContract.setReputationEngine(address(reputationEngine));
 
         // Create initial topics

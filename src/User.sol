@@ -74,6 +74,7 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     TeamRegistry private _teamRegistry;
     address public reputationEngine; // Will be set after ReputationEngine deployment
     address public peerRatingContract; // Will be set after PeerRating deployment
+    address public challengeContract; // Will be set after Challenge deployment
 
     /*///////////////////////////
            EVENTS
@@ -92,7 +93,7 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     ///////////////////////////*/
 
     modifier onlyReputationEngine() {
-        if (msg.sender != reputationEngine) revert Unauthorized();
+        if (msg.sender != reputationEngine && msg.sender != challengeContract) revert Unauthorized();
         _;
     }
 
@@ -153,6 +154,15 @@ contract User is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     function setPeerRatingContract(address _peerRatingContract) external onlyOwner {
         if (peerRatingContract != address(0)) revert Unauthorized();
         peerRatingContract = _peerRatingContract;
+    }
+
+    /**
+     * @notice Set the challenge contract address (can only be done once)
+     * @param _challengeContract Address of the Challenge contract
+     */
+    function setChallengeContract(address _challengeContract) external onlyOwner {
+        if (challengeContract != address(0)) revert Unauthorized();
+        challengeContract = _challengeContract;
     }
 
     /**
