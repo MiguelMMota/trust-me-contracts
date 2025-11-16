@@ -70,6 +70,8 @@ contract DeployScript is Script, DeploymentConfig {
 
         vm.stopBroadcast();
 
+        fillPeerRatingData(peerRatingContract, deployer);
+
         // Print deployment summary
         console.log("\n===============================================");
         console.log("         Deployment Summary");
@@ -239,8 +241,6 @@ contract DeployScript is Script, DeploymentConfig {
 
         console.log("=== PeerRating Deployment Complete ===\n");
 
-        fillPeerRatingData(proxy, deployer);
-
         return proxy;
     }
 
@@ -370,7 +370,7 @@ contract DeployScript is Script, DeploymentConfig {
 
         console.log("=== TeamRegistry Deployment Complete ===\n");
 
-        fillTeamRegistryData(proxy, deployer);
+        fillTeamRegistryData(proxy);
 
         return proxy;
     }
@@ -580,10 +580,8 @@ contract DeployScript is Script, DeploymentConfig {
         console.log("===============================================\n");
     }
 
-    function fillTeamRegistryData(address proxy, address deployer) private {
+    function fillTeamRegistryData(address proxy) private {
         console.log("\n=== Creating Test Teams ===");
-
-        vm.startBroadcast(deployer);
 
         TeamRegistry teamRegistry = TeamRegistry(proxy);
 
@@ -592,8 +590,7 @@ contract DeployScript is Script, DeploymentConfig {
         // testUsers[0] = Alice, testUsers[1] = Bob, testUsers[2] = Charlie, testUsers[3] = David
 
         // Team 1: Alice's Frontend Team
-        vm.stopPrank();
-        vm.startPrank(testUsers[0]); // Alice
+        vm.startBroadcast(testUsers[0]);
         uint64 team1Id = teamRegistry.createTeam("Frontend Development Team");
         teamRegistry.addMember(team1Id, testUsers[1], TeamRegistry.TeamRole.Member); // Add Bob as Member
         console.log("Team 1 created by Alice (testUsers[0])");
@@ -611,30 +608,10 @@ contract DeployScript is Script, DeploymentConfig {
         console.log("  - Members: Alice (Owner), Charlie (Admin), David (Member)");
 
         vm.sleep(2000);
-
-        // Team 3: Bob's Backend Team
-        vm.stopPrank();
-        vm.startPrank(testUsers[1]); // Bob
-        uint64 team3Id = teamRegistry.createTeam("Backend Infrastructure Team");
-        teamRegistry.addMember(team3Id, testUsers[0], TeamRegistry.TeamRole.Admin); // Add Alice as Admin
-        console.log("Team 3 created by Bob (testUsers[1])");
-        console.log("  - Name: Backend Infrastructure Team");
-        console.log("  - Members: Bob (Owner), Alice (Admin)");
-
-        vm.stopPrank();
-        vm.startPrank(deployer);
-
-        vm.sleep(2000);
+        vm.stopBroadcast();
 
         console.log("=== Team Creation Complete ===");
-        console.log("3 teams have been created");
-        console.log("All teams include Alice (testUsers[0])");
         console.log("===============================================\n");
-
-        vm.stopPrank();
-        vm.startBroadcast(deployer);
-
-        vm.stopBroadcast();
     }
 
     function fillUserData(address proxy, address deployer) private {

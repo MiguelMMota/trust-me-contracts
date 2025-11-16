@@ -406,7 +406,7 @@ contract PeerRating is Initializable, UUPSUpgradeable, OwnableUpgradeable {
      */
     function getTeamUserTopicRatingAtTime(uint64 teamId, address user, uint32 topicId, uint64 scoreTime)
         external
-        view
+        pure
         returns (UserTopicRatings memory)
     {
         // STUB: Placeholder for team-scoped ratings

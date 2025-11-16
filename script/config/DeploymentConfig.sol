@@ -137,7 +137,7 @@ abstract contract DeploymentConfig is Script, ServerConstants {
                 '",\n',
                 '  "poll": "',
                 vm.toString(deployment.poll),
-                '"\n',
+                '",\n',
                 '  "teamRegistry": "',
                 vm.toString(deployment.teamRegistry),
                 '"\n',
