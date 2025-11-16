@@ -23,12 +23,13 @@ abstract contract DeploymentConfig is Script, ServerConstants {
     //////////////////////////*/
 
     struct Deployment {
-        address topicRegistry;
-        address user;
         address challenge;
         address peerRating;
-        address reputationEngine;
         address poll;
+        address reputationEngine;
+        address teamRegistry;
+        address topicRegistry;
+        address user;
     }
 
     /*//////////////////////////
@@ -83,12 +84,13 @@ abstract contract DeploymentConfig is Script, ServerConstants {
 
         // Check if file exists
         try vm.readFile(path) returns (string memory json) {
-            deployment.topicRegistry = vm.parseJsonAddress(json, ".topicRegistry");
-            deployment.user = vm.parseJsonAddress(json, ".user");
             deployment.challenge = vm.parseJsonAddress(json, ".challenge");
             deployment.peerRating = vm.parseJsonAddress(json, ".peerRating");
-            deployment.reputationEngine = vm.parseJsonAddress(json, ".reputationEngine");
             deployment.poll = vm.parseJsonAddress(json, ".poll");
+            deployment.reputationEngine = vm.parseJsonAddress(json, ".reputationEngine");
+            deployment.teamRegistry = vm.parseJsonAddress(json, ".teamRegistry");
+            deployment.topicRegistry = vm.parseJsonAddress(json, ".topicRegistry");
+            deployment.user = vm.parseJsonAddress(json, ".user");
 
             console.log("Loaded deployment config from:", path);
         } catch {
@@ -136,6 +138,9 @@ abstract contract DeploymentConfig is Script, ServerConstants {
                 '  "poll": "',
                 vm.toString(deployment.poll),
                 '"\n',
+                '  "teamRegistry": "',
+                vm.toString(deployment.teamRegistry),
+                '"\n',
                 "}"
             )
         );
@@ -150,18 +155,20 @@ abstract contract DeploymentConfig is Script, ServerConstants {
     function updateContractAddress(string memory contractName, address newAddress) internal {
         Deployment memory deployment = loadDeployment();
 
-        if (keccak256(bytes(contractName)) == keccak256(bytes("TopicRegistry"))) {
-            deployment.topicRegistry = newAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("User"))) {
-            deployment.user = newAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("Challenge"))) {
+        if (keccak256(bytes(contractName)) == keccak256(bytes("Challenge"))) {
             deployment.challenge = newAddress;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("PeerRating"))) {
             deployment.peerRating = newAddress;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("ReputationEngine"))) {
-            deployment.reputationEngine = newAddress;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("Poll"))) {
             deployment.poll = newAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("ReputationEngine"))) {
+            deployment.reputationEngine = newAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("TeamRegistry"))) {
+            deployment.teamRegistry = newAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("TopicRegistry"))) {
+            deployment.topicRegistry = newAddress;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("User"))) {
+            deployment.user = newAddress;
         } else {
             revert(string(abi.encodePacked("Unknown contract: ", contractName)));
         }
@@ -176,18 +183,20 @@ abstract contract DeploymentConfig is Script, ServerConstants {
     function isDeployed(string memory contractName) internal view returns (bool) {
         Deployment memory deployment = loadDeployment();
 
-        if (keccak256(bytes(contractName)) == keccak256(bytes("TopicRegistry"))) {
-            return deployment.topicRegistry != address(0);
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("User"))) {
-            return deployment.user != address(0);
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("Challenge"))) {
+        if (keccak256(bytes(contractName)) == keccak256(bytes("Challenge"))) {
             return deployment.challenge != address(0);
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("PeerRating"))) {
             return deployment.peerRating != address(0);
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("ReputationEngine"))) {
-            return deployment.reputationEngine != address(0);
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("Poll"))) {
             return deployment.poll != address(0);
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("ReputationEngine"))) {
+            return deployment.reputationEngine != address(0);
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("TeamRegistry"))) {
+            return deployment.teamRegistry != address(0);
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("TopicRegistry"))) {
+            return deployment.topicRegistry != address(0);
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("User"))) {
+            return deployment.user != address(0);
         }
 
         return false;
@@ -199,18 +208,20 @@ abstract contract DeploymentConfig is Script, ServerConstants {
     function getContractAddress(string memory contractName) internal view returns (address) {
         Deployment memory deployment = loadDeployment();
 
-        if (keccak256(bytes(contractName)) == keccak256(bytes("TopicRegistry"))) {
-            return deployment.topicRegistry;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("User"))) {
-            return deployment.user;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("Challenge"))) {
+        if (keccak256(bytes(contractName)) == keccak256(bytes("Challenge"))) {
             return deployment.challenge;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("Poll"))) {
+            return deployment.poll;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("PeerRating"))) {
             return deployment.peerRating;
         } else if (keccak256(bytes(contractName)) == keccak256(bytes("ReputationEngine"))) {
             return deployment.reputationEngine;
-        } else if (keccak256(bytes(contractName)) == keccak256(bytes("Poll"))) {
-            return deployment.poll;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("TeamRegistry"))) {
+            return deployment.teamRegistry;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("TopicRegistry"))) {
+            return deployment.topicRegistry;
+        } else if (keccak256(bytes(contractName)) == keccak256(bytes("User"))) {
+            return deployment.user;
         }
 
         revert(string(abi.encodePacked("Unknown contract: ", contractName)));
@@ -223,12 +234,13 @@ abstract contract DeploymentConfig is Script, ServerConstants {
         Deployment memory deployment = loadDeployment();
 
         console.log("\n=== Deployment Status for", getNetworkName(), "===");
-        console.log("TopicRegistry:", deployment.topicRegistry);
-        console.log("User:", deployment.user);
         console.log("Challenge:", deployment.challenge);
         console.log("PeerRating:", deployment.peerRating);
-        console.log("ReputationEngine:", deployment.reputationEngine);
         console.log("Poll:", deployment.poll);
+        console.log("ReputationEngine:", deployment.reputationEngine);
+        console.log("TeamRegistry:", deployment.teamRegistry);
+        console.log("TopicRegistry:", deployment.topicRegistry);
+        console.log("User:", deployment.user);
         console.log("=====================================\n");
     }
 }
