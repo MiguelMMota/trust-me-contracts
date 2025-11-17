@@ -33,21 +33,23 @@ echo "=============================================="
 if command -v jq &> /dev/null; then
     # Use jq if available
     CHAIN_ID=$(jq -r '.chainId' "$DEPLOYMENT_FILE")
-    TOPIC_REGISTRY=$(jq -r '.topicRegistry' "$DEPLOYMENT_FILE")
-    USER=$(jq -r '.user' "$DEPLOYMENT_FILE")
     CHALLENGE=$(jq -r '.challenge' "$DEPLOYMENT_FILE")
     PEER_RATING=$(jq -r '.peerRating' "$DEPLOYMENT_FILE")
-    REPUTATION_ENGINE=$(jq -r '.reputationEngine' "$DEPLOYMENT_FILE")
     POLL=$(jq -r '.poll' "$DEPLOYMENT_FILE")
+    REPUTATION_ENGINE=$(jq -r '.reputationEngine' "$DEPLOYMENT_FILE")
+    TEAM_REGISTRY=$(jq -r '.teamRegistry' "$DEPLOYMENT_FILE")
+    TOPIC_REGISTRY=$(jq -r '.topicRegistry' "$DEPLOYMENT_FILE")
+    USER=$(jq -r '.user' "$DEPLOYMENT_FILE")
 else
     # Fallback: use grep and sed
     CHAIN_ID=$(grep -o '"chainId": [0-9]*' "$DEPLOYMENT_FILE" | grep -o '[0-9]*')
-    TOPIC_REGISTRY=$(grep -o '"topicRegistry": "[^"]*"' "$DEPLOYMENT_FILE" | cut -d'"' -f4)
-    USER=$(grep -o '"user": "[^"]*"' "$DEPLOYMENT_FILE" | cut -d'"' -f4)
     CHALLENGE=$(grep -o '"challenge": "[^"]*"' "$DEPLOYMENT_FILE" | cut -d'"' -f4)
     PEER_RATING=$(grep -o '"peerRating": "[^"]*"' "$DEPLOYMENT_FILE" | cut -d'"' -f4)
-    REPUTATION_ENGINE=$(grep -o '"reputationEngine": "[^"]*"' "$DEPLOYMENT_FILE" | cut -d'"' -f4)
     POLL=$(grep -o '"poll": "[^"]*"' "$DEPLOYMENT_FILE" | cut -d'"' -f4)
+    REPUTATION_ENGINE=$(grep -o '"reputationEngine": "[^"]*"' "$DEPLOYMENT_FILE" | cut -d'"' -f4)
+    TEAM_REGISTRY=$(grep -o '"teamRegistry": "[^"]*"' "$DEPLOYMENT_FILE" | cut -d'"' -f4)
+    TOPIC_REGISTRY=$(grep -o '"topicRegistry": "[^"]*"' "$DEPLOYMENT_FILE" | cut -d'"' -f4)
+    USER=$(grep -o '"user": "[^"]*"' "$DEPLOYMENT_FILE" | cut -d'"' -f4)
 fi
 
 echo "Chain ID: $CHAIN_ID"
@@ -55,6 +57,7 @@ echo "Challenge: $CHALLENGE"
 echo "PeerRating: $PEER_RATING"
 echo "Poll: $POLL"
 echo "ReputationEngine: $REPUTATION_ENGINE"
+echo "TeamRegistry: $TEAM_REGISTRY"
 echo "TopicRegistry: $TOPIC_REGISTRY"
 echo "User: $USER"
 
@@ -66,6 +69,7 @@ export const ${NETWORK_UPPER}_CONTRACTS = {
   PeerRating: '$PEER_RATING',
   Poll: '$POLL',
   ReputationEngine: '$REPUTATION_ENGINE',
+  TeamRegistry: '$TEAM_REGISTRY',
   TopicRegistry: '$TOPIC_REGISTRY',
   User: '$USER',
 };

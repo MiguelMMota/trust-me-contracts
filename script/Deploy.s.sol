@@ -163,13 +163,18 @@ contract DeployScript is Script, DeploymentConfig {
         if (!isDeployed("TopicRegistry")) {
             revert("TopicRegistry must be deployed first");
         }
+        if (!isDeployed("TeamRegistry")) {
+            revert("TeamRegistry must be deployed first");
+        }
         if (!isDeployed("User")) {
             revert("User must be deployed first");
         }
 
         address topicRegistry = getContractAddress("TopicRegistry");
+        address teamRegistry = getContractAddress("TeamRegistry");
         address user = getContractAddress("User");
         console.log("Using TopicRegistry at:", topicRegistry);
+        console.log("Using TeamRegistry at:", teamRegistry);
         console.log("Using User at:", user);
 
         vm.startBroadcast(deployer);
@@ -182,6 +187,7 @@ contract DeployScript is Script, DeploymentConfig {
             Challenge.initialize.selector,
             deployer, // initialOwner
             topicRegistry, // _topicRegistry
+            teamRegistry, // _teamRegistry
             user // _userContract
         );
 

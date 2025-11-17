@@ -54,8 +54,9 @@ contract TeamIntegrationTest is Test {
 
         // Deploy Challenge
         Challenge challengeImpl = new Challenge();
-        bytes memory challengeInitData =
-            abi.encodeWithSelector(Challenge.initialize.selector, admin, address(topicRegistry), address(userContract));
+        bytes memory challengeInitData = abi.encodeWithSelector(
+            Challenge.initialize.selector, admin, address(topicRegistry), address(teamRegistry), address(userContract)
+        );
         ERC1967Proxy challengeProxy = new ERC1967Proxy(address(challengeImpl), challengeInitData);
         challengeContract = Challenge(address(challengeProxy));
 

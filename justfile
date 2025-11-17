@@ -83,6 +83,7 @@ copy-abis:
     @cp out/PeerRating.sol/PeerRating.json ../trust-me-dapp/abis/contracts/
     @cp out/Poll.sol/Poll.json ../trust-me-dapp/abis/contracts/
     @cp out/ReputationEngine.sol/ReputationEngine.json ../trust-me-dapp/abis/contracts/
+    @cp out/TeamRegistry.sol/TeamRegistry.json ../trust-me-dapp/abis/contracts/
     @cp out/TopicRegistry.sol/TopicRegistry.json ../trust-me-dapp/abis/contracts/
     @cp out/User.sol/User.json ../trust-me-dapp/abis/contracts/
     @echo "ABIs copied successfully!"

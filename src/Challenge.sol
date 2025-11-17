@@ -3,6 +3,7 @@ pragma solidity ^0.8.24;
 
 import {ReputationEngine} from "./ReputationEngine.sol";
 import {TopicRegistry} from "./TopicRegistry.sol";
+import {TeamRegistry} from "./TeamRegistry.sol";
 import {User} from "./User.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -25,6 +26,7 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     error AlreadyAttempted();
     error UserNotRegistered();
     error EmptyHash();
+    error NotTeamMember();
 
     /*///////////////////////////
       TYPE DECLARATIONS
@@ -48,6 +50,7 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         uint64 id;
         address creator;
         uint32 topicId;
+        uint64 teamId; // 0 = public challenge, non-zero = team-only challenge
         DifficultyLevel difficulty;
         ChallengeStatus status;
         bytes32 questionHash; // Hash of question content (stored off-chain)
@@ -73,9 +76,11 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     mapping(address => mapping(uint64 => ChallengeAttempt)) public userAttempts; // user => challengeId => attempt
     mapping(address => uint64[]) public userChallengeHistory; // user => challengeIds[]
     mapping(uint32 => uint64[]) public topicChallenges; // topicId => challengeIds[]
+    mapping(uint64 => uint64[]) public teamChallenges; // teamId => challengeIds[]
 
     uint64 public challengeCount;
     TopicRegistry public topicRegistry;
+    TeamRegistry public teamRegistry;
     User public userContract;
     address public reputationEngine;
 
@@ -84,7 +89,11 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     ///////////////////////////*/
 
     event ChallengeCreated(
-        uint64 indexed challengeId, address indexed creator, uint32 indexed topicId, DifficultyLevel difficulty
+        uint64 indexed challengeId,
+        address indexed creator,
+        uint32 indexed topicId,
+        uint64 teamId,
+        DifficultyLevel difficulty
     );
     event ChallengeAttempted(uint64 indexed challengeId, address indexed user, bool isCorrect, uint64 timestamp);
     event ChallengeStatusUpdated(uint64 indexed challengeId, ChallengeStatus newStatus);
@@ -111,11 +120,16 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
      * @notice Initialize the contract
      * @param initialOwner The address that will own this contract
      * @param _topicRegistry Address of the TopicRegistry contract
+     * @param _teamRegistry Address of the TeamRegistry contract
      * @param _userContract Address of the User contract
      */
-    function initialize(address initialOwner, address _topicRegistry, address _userContract) external initializer {
+    function initialize(address initialOwner, address _topicRegistry, address _teamRegistry, address _userContract)
+        external
+        initializer
+    {
         __Ownable_init(initialOwner);
         topicRegistry = TopicRegistry(_topicRegistry);
+        teamRegistry = TeamRegistry(_teamRegistry);
         userContract = User(_userContract);
         challengeCount = 0;
     }
@@ -136,6 +150,7 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     /**
      * @notice Create a new challenge
      * @param topicId Topic ID for this challenge
+     * @param teamId Team ID (0 for public, non-zero for team-only)
      * @param difficulty Difficulty level
      * @param questionHash Hash of the question content
      * @param correctAnswerHash Hash of the correct answer
@@ -143,6 +158,7 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
      */
     function createChallenge(
         uint32 topicId,
+        uint64 teamId,
         DifficultyLevel difficulty,
         bytes32 questionHash,
         bytes32 correctAnswerHash
@@ -156,6 +172,11 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         // Ensure user is registered
         if (!userContract.isRegistered(msg.sender)) revert UserNotRegistered();
 
+        // If teamId is provided, verify creator is a team member
+        if (teamId != 0) {
+            if (!teamRegistry.isTeamMember(teamId, msg.sender)) revert NotTeamMember();
+        }
+
         challengeCount++;
         uint64 newChallengeId = challengeCount;
 
@@ -163,6 +184,7 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
             id: newChallengeId,
             creator: msg.sender,
             topicId: topicId,
+            teamId: teamId,
             difficulty: difficulty,
             status: ChallengeStatus.Active,
             questionHash: questionHash,
@@ -174,7 +196,12 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
 
         topicChallenges[topicId].push(newChallengeId);
 
-        emit ChallengeCreated(newChallengeId, msg.sender, topicId, difficulty);
+        // Track team challenges separately if it's a team challenge
+        if (teamId != 0) {
+            teamChallenges[teamId].push(newChallengeId);
+        }
+
+        emit ChallengeCreated(newChallengeId, msg.sender, topicId, teamId, difficulty);
         return newChallengeId;
     }
 
@@ -190,6 +217,11 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
         if (challenge.status != ChallengeStatus.Active) revert ChallengeNotActive();
         if (!userContract.isRegistered(msg.sender)) revert UserNotRegistered();
         if (userAttempts[msg.sender][challengeId].attemptedAt != 0) revert AlreadyAttempted();
+
+        // If challenge is team-only, verify user is a team member
+        if (challenge.teamId != 0) {
+            if (!teamRegistry.isTeamMember(challenge.teamId, msg.sender)) revert NotTeamMember();
+        }
 
         bool isCorrect = (answerHash == challenge.correctAnswerHash);
 
@@ -263,6 +295,15 @@ contract Challenge is Initializable, UUPSUpgradeable, OwnableUpgradeable {
      */
     function getTopicChallenges(uint32 topicId) external view returns (uint64[] memory) {
         return topicChallenges[topicId];
+    }
+
+    /**
+     * @notice Get all challenges for a team
+     * @param teamId Team ID
+     * @return Array of challenge IDs
+     */
+    function getTeamChallenges(uint64 teamId) external view returns (uint64[] memory) {
+        return teamChallenges[teamId];
     }
 
     /**

@@ -4,11 +4,13 @@ pragma solidity ^0.8.24;
 import {Test} from "forge-std/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {TopicRegistry} from "../src/TopicRegistry.sol";
+import {TeamRegistry} from "../src/TeamRegistry.sol";
 import {User} from "../src/User.sol";
 import {Challenge} from "../src/Challenge.sol";
 
 contract ChallengeTest is Test {
     TopicRegistry public topicRegistry;
+    TeamRegistry public teamRegistry;
     User public userContract;
     Challenge public challengeContract;
 
@@ -28,6 +30,12 @@ contract ChallengeTest is Test {
         ERC1967Proxy topicProxy = new ERC1967Proxy(address(topicImpl), topicInitData);
         topicRegistry = TopicRegistry(address(topicProxy));
 
+        // Deploy TeamRegistry with proxy
+        TeamRegistry teamImpl = new TeamRegistry();
+        bytes memory teamInitData = abi.encodeWithSelector(TeamRegistry.initialize.selector);
+        ERC1967Proxy teamProxy = new ERC1967Proxy(address(teamImpl), teamInitData);
+        teamRegistry = TeamRegistry(address(teamProxy));
+
         // Deploy User with proxy
         User userImpl = new User();
         bytes memory userInitData = abi.encodeWithSelector(User.initialize.selector, admin, address(topicRegistry));
@@ -36,8 +44,9 @@ contract ChallengeTest is Test {
 
         // Deploy Challenge with proxy
         Challenge challengeImpl = new Challenge();
-        bytes memory challengeInitData =
-            abi.encodeWithSelector(Challenge.initialize.selector, admin, address(topicRegistry), address(userContract));
+        bytes memory challengeInitData = abi.encodeWithSelector(
+            Challenge.initialize.selector, admin, address(topicRegistry), address(teamRegistry), address(userContract)
+        );
         ERC1967Proxy challengeProxy = new ERC1967Proxy(address(challengeImpl), challengeInitData);
         challengeContract = Challenge(address(challengeProxy));
 
@@ -66,7 +75,7 @@ contract ChallengeTest is Test {
         bytes32 answerHash = keccak256(abi.encodePacked("4"));
 
         uint64 challengeId =
-            challengeContract.createChallenge(mathTopicId, Challenge.DifficultyLevel.Easy, questionHash, answerHash);
+            challengeContract.createChallenge(mathTopicId, 0, Challenge.DifficultyLevel.Easy, questionHash, answerHash);
 
         assertEq(challengeId, 1);
 
@@ -87,7 +96,7 @@ contract ChallengeTest is Test {
         vm.prank(alice);
         bytes32 answerHash = keccak256(abi.encodePacked("4"));
         uint64 challengeId = challengeContract.createChallenge(
-            mathTopicId, Challenge.DifficultyLevel.Easy, keccak256("What is 2+2?"), answerHash
+            mathTopicId, 0, Challenge.DifficultyLevel.Easy, keccak256("What is 2+2?"), answerHash
         );
 
         // Bob attempts challenge with correct answer
@@ -111,7 +120,7 @@ contract ChallengeTest is Test {
         vm.prank(alice);
         bytes32 correctAnswerHash = keccak256(abi.encodePacked("4"));
         uint64 challengeId = challengeContract.createChallenge(
-            mathTopicId, Challenge.DifficultyLevel.Easy, keccak256("What is 2+2?"), correctAnswerHash
+            mathTopicId, 0, Challenge.DifficultyLevel.Easy, keccak256("What is 2+2?"), correctAnswerHash
         );
 
         // Bob attempts with wrong answer
